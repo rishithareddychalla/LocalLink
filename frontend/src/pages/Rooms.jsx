@@ -1,0 +1,484 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+    Plus,
+    Users,
+    Link as LinkIcon,
+    Shield,
+    Clock,
+    Wifi,
+    ChevronRight,
+    Copy,
+    ArrowRight,
+    QrCode,
+    Lock,
+    UserCircle,
+    Search
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+import { useRoom } from '../context/RoomContext';
+import { useSettings } from '../context/SettingsContext';
+import { useNotifications } from '../context/NotificationContext';
+import RoomInterface from './RoomInterface';
+
+const Rooms = () => {
+    const navigate = useNavigate();
+    const {
+        activeRoom,
+        createRoom,
+        userRoomPreferences,
+        updatePreferences,
+        generatedId,
+        NEARBY_ROOMS
+    } = useRoom();
+
+    const { settings } = useSettings();
+    const { addNotification } = useNotifications();
+
+    // Create Room State
+    const [roomName, setRoomName] = useState('');
+    const [isPrivate, setIsPrivate] = useState(false);
+    const [password, setPassword] = useState('');
+    const [expiry, setExpiry] = useState(userRoomPreferences.lastExpirySelected || '1min');
+    const [approvalRequired, setApprovalRequired] = useState(false);
+
+    // Join Room State
+    const [roomCode, setRoomCode] = useState(userRoomPreferences.lastUsedRoomCode || '');
+    const [nickname, setNickname] = useState(userRoomPreferences.nickname || 'GuestUser_82');
+    const [createThemeColor, setCreateThemeColor] = useState(userRoomPreferences.selectedTheme || settings.accentColor);
+    const [joinThemeColor, setJoinThemeColor] = useState(userRoomPreferences.selectedTheme || settings.accentColor);
+    const [searchTermNearby, setSearchTermNearby] = useState('');
+
+    // Sync local theme color with global accent color if no local preference is set
+    useEffect(() => {
+        if (!userRoomPreferences.selectedTheme) {
+            setCreateThemeColor(settings.accentColor);
+            setJoinThemeColor(settings.accentColor);
+        }
+    }, [settings.accentColor, userRoomPreferences.selectedTheme]);
+
+    const colors = ['#00f0ff', '#A020F0', '#ff00ff', '#00ff00', '#ffff00'];
+
+    const handleCreateRoom = async (e) => {
+        e.preventDefault();
+        if (!roomName.trim()) return;
+
+        // Persist preferences (Requirement 7)
+        updatePreferences({ nickname, selectedTheme: createThemeColor });
+
+        const roomData = {
+            name: roomName,
+            password: isPrivate ? password : '',
+            expiry,
+            approvalRequired,
+            type: 'owner'
+        };
+
+        const response = await createRoom(roomData);
+        if (response.success) {
+            addNotification({
+                type: 'info',
+                title: 'Room Created',
+                message: `Successfully created room: ${roomName}`,
+                timestamp: new Date().toISOString()
+            });
+            navigate(`/room/${response.data.id}`);
+        }
+    };
+
+    const handleJoinRoom = (e) => {
+        e.preventDefault();
+        if (roomCode.trim()) {
+            // Persist preferences before moving to JoinRoom page
+            updatePreferences({ nickname, selectedTheme: joinThemeColor });
+            navigate(`/join/${roomCode}`);
+        }
+    };
+
+    const filteredNearbyRooms = NEARBY_ROOMS.filter(room =>
+        room.name.toLowerCase().includes(searchTermNearby.toLowerCase())
+    );
+
+    const cn = (...inputs) => twMerge(clsx(inputs));
+
+    return (
+        <div className="min-h-full bg-background p-4 sm:p-6 md:p-0.5 pb-12 overflow-x-hidden">
+            <div className="max-w-none space-y-12">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 items-start">
+                    {/* Create Room Column */}
+                    <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="glass-panel p-6 sm:p-8 md:p-10 rounded-[28px] md:rounded-[32px] space-y-8 md:space-y-10"
+                    >
+                        <div className="flex items-center gap-4 mb-2">
+                            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
+                                <Plus className="text-primary" size={20} />
+                            </div>
+                            <h2 className="text-xl md:text-2xl font-bold text-text-main tracking-tight">Create Room</h2>
+                        </div>
+
+                        <form onSubmit={handleCreateRoom} className="space-y-7 md:space-y-8">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-text-main-muted uppercase tracking-widest pl-1">Room Name</label>
+                                <input
+                                    type="text"
+                                    value={roomName}
+                                    onChange={(e) => setRoomName(e.target.value)}
+                                    placeholder="e.g. Creative Session"
+                                    className="w-full bg-background border border-border rounded-2xl py-3.5 md:py-4 px-5 md:px-6 text-text-main placeholder:text-text-main-muted focus:outline-none focus:border-primary/50 transition-all font-medium text-sm md:text-base"
+                                />
+                            </div>
+
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-bold text-text-main-muted uppercase tracking-widest pl-1">Room Access</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setIsPrivate(false);
+                                            setPassword('');
+                                        }}
+                                        className={cn(
+                                            "py-3 rounded-xl text-xs font-bold transition-all border",
+                                            !isPrivate
+                                                ? "text-background border-transparent shadow-lg"
+                                                : "bg-surface text-text-main-muted border-border hover:border-text-muted/20"
+                                        )}
+                                        style={!isPrivate ? { backgroundColor: createThemeColor, boxShadow: `0 0 20px ${createThemeColor}2a` } : {}}
+                                    >
+                                        Public
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsPrivate(true)}
+                                        className={cn(
+                                            "py-3 rounded-xl text-xs font-bold transition-all border",
+                                            isPrivate
+                                                ? "text-background border-transparent shadow-lg"
+                                                : "bg-surface text-text-main-muted border-border hover:border-text-muted/20"
+                                        )}
+                                        style={isPrivate ? { backgroundColor: createThemeColor, boxShadow: `0 0 20px ${createThemeColor}2a` } : {}}
+                                    >
+                                        Private
+                                    </button>
+                                </div>
+                            </div>
+
+                            <AnimatePresence>
+                                {isPrivate && (
+                                    <motion.div
+                                        initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                                        animate={{ opacity: 1, height: 'auto', marginTop: 16 }}
+                                        exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                                        className="space-y-2 overflow-hidden"
+                                    >
+                                        <label className="text-[10px] font-bold text-text-main-muted uppercase tracking-widest pl-1">Room Password</label>
+                                        <input
+                                            type="password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            placeholder="••••••••"
+                                            required={isPrivate}
+                                            className="w-full bg-background border border-border rounded-2xl py-3.5 md:py-4 px-5 md:px-6 text-text-main placeholder:text-text-main-muted focus:outline-none transition-all font-medium text-sm md:text-base"
+                                            style={{ borderColor: isPrivate ? `${createThemeColor}14` : 'var(--border-color)' }}
+                                            onFocus={(e) => e.target.style.borderColor = createThemeColor}
+                                            onBlur={(e) => e.target.style.borderColor = `${createThemeColor}14`}
+                                        />
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
+                            <div className="flex items-center justify-between p-4 bg-background border border-border rounded-2xl group transition-all cursor-pointer"
+                                onClick={() => setApprovalRequired(!approvalRequired)}
+                                style={{ borderColor: approvalRequired ? `${createThemeColor}2a` : 'var(--border-color)' }}>
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 rounded-xl transition-colors"
+                                        style={{
+                                            backgroundColor: approvalRequired ? `${createThemeColor}0d` : 'rgba(0,0,0,0.05)',
+                                            color: approvalRequired ? createThemeColor : 'var(--text-secondary)'
+                                        }}>
+                                        <Lock size={16} />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold text-text-main uppercase tracking-tight">Moderate Entry</p>
+                                        <p className="text-[9px] text-text-main-muted font-bold uppercase tracking-widest">Creator must approve all joiners</p>
+                                    </div>
+                                </div>
+                                <div
+                                    className="w-10 h-5 rounded-full transition-colors relative"
+                                    style={{ backgroundColor: approvalRequired ? createThemeColor : 'var(--border-color)' }}
+                                >
+                                    <motion.div
+                                        className="w-4 h-4 bg-white rounded-full absolute top-0.5 shadow-sm"
+                                        animate={{ left: approvalRequired ? "calc(100% - 18px)" : "2px" }}
+                                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-bold text-text-main-muted uppercase tracking-widest pl-1">Expiry Timer</label>
+                                <div className="grid grid-cols-3 gap-2 md:gap-3">
+                                    {['1min', '2min', '5min'].map((time) => (
+                                        <button
+                                            key={time}
+                                            type="button"
+                                            onClick={() => setExpiry(time)}
+                                            className={cn(
+                                                "py-3 rounded-xl text-xs md:text-sm font-bold transition-all border",
+                                                expiry === time
+                                                    ? "text-background border-transparent shadow-lg"
+                                                    : "bg-surface text-text-main-muted border-border hover:border-text-muted/20"
+                                            )}
+                                            style={expiry === time ? { backgroundColor: createThemeColor, boxShadow: `0 0 20px ${createThemeColor}2a` } : {}}
+                                        >
+                                            {time}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="space-y-3">
+                                <label className="text-[10px] font-bold text-text-main-muted uppercase tracking-widest pl-1">Theme Override</label>
+                                <div className="flex items-center gap-2 pt-1 overflow-x-auto no-scrollbar pb-1">
+                                    {colors.map((c) => (
+                                        <button
+                                            key={c}
+                                            type="button"
+                                            onClick={() => setCreateThemeColor(c)}
+                                            className={cn(
+                                                "w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 shrink-0",
+                                                createThemeColor === c ? "scale-110" : "border-transparent"
+                                            )}
+                                            style={{
+                                                backgroundColor: c,
+                                                borderColor: createThemeColor === c ? 'var(--text-primary)' : 'transparent',
+                                                boxShadow: createThemeColor === c ? `0 0 10px ${c}` : 'none'
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="space-y-2 relative">
+                                <label className="text-[10px] font-bold uppercase tracking-widest pl-1" style={{ color: `${createThemeColor}99` }}>Auto-generated ID</label>
+                                <div className="w-full bg-background border rounded-2xl py-3.5 md:py-4 px-5 md:px-6 font-bold tracking-[0.2em] flex items-center justify-between text-xs md:text-sm transition-colors"
+                                    style={{ color: createThemeColor, borderColor: `${createThemeColor}20` }}>
+                                    <span>{generatedId}</span>
+                                    <button type="button" className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors">
+                                        <Copy size={16} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <button
+                                type="submit"
+                                className="w-full text-background py-3.5 md:py-4.5 rounded-2xl font-bold text-base md:text-lg transition-all active:scale-[0.98] shadow-lg"
+                                style={{ backgroundColor: createThemeColor, boxShadow: `0 0 30px ${createThemeColor}20` }}
+                                onMouseEnter={(e) => e.target.style.filter = 'brightness(1.1)'}
+                                onMouseLeave={(e) => e.target.style.filter = 'none'}
+                            >
+                                Create Room
+                            </button>
+                        </form>
+                    </motion.div>
+
+                    {/* Join Room Card */}
+                    <motion.div
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="glass-panel p-6 sm:p-8 rounded-[28px] md:rounded-[32px] space-y-6"
+                    >
+                        <div className="space-y-6">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                                    style={{ backgroundColor: `${joinThemeColor}0d` }}>
+                                    <Users style={{ color: joinThemeColor }} size={20} />
+                                </div>
+                                <h2 className="text-xl md:text-2xl font-bold text-text-main tracking-tight">Join Room</h2>
+                            </div>
+
+                            <div className="relative group">
+                                <input
+                                    type="text"
+                                    value={roomCode}
+                                    onChange={(e) => setRoomCode(e.target.value)}
+                                    placeholder="ENTER CODE"
+                                    className="w-full bg-background border border-border rounded-2xl py-4 px-5 md:px-6 text-text-main placeholder:text-text-main-muted focus:outline-none transition-all font-bold tracking-[0.3em] text-xs md:text-sm uppercase"
+                                    style={{ borderColor: `${joinThemeColor}14` }}
+                                    onFocus={(e) => e.target.style.borderColor = joinThemeColor}
+                                    onBlur={(e) => e.target.style.borderColor = `${joinThemeColor}14`}
+                                />
+                                <button
+                                    onClick={handleJoinRoom}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 w-12 h-12 text-background rounded-xl md:rounded-2xl flex items-center justify-center transition-all active:scale-95 shadow-lg group"
+                                    style={{ backgroundColor: joinThemeColor }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.filter = 'brightness(1.1)';
+                                        e.currentTarget.querySelector('svg').style.transform = 'translateX(2px) scale(1.1)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.filter = 'none';
+                                        e.currentTarget.querySelector('svg').style.transform = 'none';
+                                    }}
+                                >
+                                    <ArrowRight size={24} className="transition-transform duration-300" />
+                                </button>
+                            </div>
+
+                            {/* QR Placeholder */}
+                            <div className="aspect-[21/9] bg-background border border-dashed border-border rounded-2xl flex flex-col items-center justify-center gap-3 group cursor-pointer transition-colors"
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.borderColor = `${joinThemeColor}2a`;
+                                    e.currentTarget.querySelector('svg').style.color = joinThemeColor;
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.borderColor = 'var(--border-color)';
+                                    e.currentTarget.querySelector('svg').style.color = 'var(--text-secondary)';
+                                }}>
+                                <QrCode size={28} className="text-text-main-muted transition-colors" />
+                                <span className="text-[10px] font-bold text-text-main-muted uppercase tracking-[0.2em] text-center px-4">Scan QR</span>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-6 mt-4">
+                            <div className="flex-1 space-y-2">
+                                <label className="text-[10px] font-bold text-text-main-muted uppercase tracking-widest pl-1">Your Nickname</label>
+                                <input
+                                    type="text"
+                                    value={nickname}
+                                    onChange={(e) => setNickname(e.target.value)}
+                                    className="w-full bg-background border border-border rounded-xl py-3 px-4 text-sm text-text-main focus:outline-none transition-all"
+                                    style={{ borderColor: 'var(--border-color)' }}
+                                    onFocus={(e) => e.target.style.borderColor = joinThemeColor}
+                                    onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
+                                />
+                            </div>
+                            <div className="sm:w-32 lg:w-40 space-y-2">
+                                <label className="text-[10px] font-bold text-text-main-muted uppercase tracking-widest pl-1">ThemeOverride</label>
+                                <div className="flex items-center gap-2 pt-1 overflow-x-auto no-scrollbar pb-1">
+                                    {colors.map((c) => (
+                                        <button
+                                            key={c}
+                                            onClick={() => setJoinThemeColor(c)}
+                                            className={cn(
+                                                "w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 shrink-0",
+                                                joinThemeColor === c ? "scale-110" : "border-transparent"
+                                            )}
+                                            style={{
+                                                backgroundColor: c,
+                                                borderColor: joinThemeColor === c ? 'var(--text-primary)' : 'transparent',
+                                                boxShadow: joinThemeColor === c ? `0 0 10px ${c}` : 'none'
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                </div>
+
+                {/* Nearby Rooms Card - Horizontal Layout */}
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="glass-panel p-6 sm:p-8 rounded-[28px] md:rounded-[32px] space-y-6"
+                >
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <Wifi className="text-primary" size={18} />
+                            <h3 className="text-lg font-black text-text-main italic uppercase tracking-wider">Nearby Discovery</h3>
+                        </div>
+
+                        <div className="flex items-center gap-6">
+                            {/* Search Bar */}
+                            <div className="relative group w-full md:w-64">
+                                <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-main-muted transition-colors" />
+                                <input
+                                    type="text"
+                                    placeholder="SCANNING NETWORK..."
+                                    value={searchTermNearby}
+                                    onChange={(e) => setSearchTermNearby(e.target.value)}
+                                    className="w-full bg-background border border-border rounded-xl py-2.5 pl-10 pr-4 text-[10px] font-bold tracking-[0.2em] text-text-main placeholder:text-text-main-muted focus:outline-none transition-all uppercase"
+                                    onFocus={(e) => {
+                                        e.target.style.borderColor = 'var(--color-primary)';
+                                        e.target.previousSibling.style.color = 'var(--color-primary)';
+                                    }}
+                                    onBlur={(e) => {
+                                        e.target.style.borderColor = 'var(--border-color)';
+                                        e.target.previousSibling.style.color = 'var(--text-secondary)';
+                                    }}
+                                />
+                            </div>
+
+                            <div className="hidden md:flex items-center gap-2">
+                                <span className="text-[9px] font-bold text-primary tracking-widest uppercase">RADAR ACTIVE</span>
+                                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {filteredNearbyRooms.length === 0 ? (
+                            <div className="col-span-full text-center py-12 opacity-20 italic text-[10px] text-text-main uppercase tracking-[0.4em] font-black">
+                                No nodes detected in proximity
+                            </div>
+                        ) : filteredNearbyRooms.map((room) => (
+                            <div key={room.id} className="bg-background border border-border rounded-2xl p-5 hover:border-primary/20 transition-all group flex flex-col gap-5">
+                                <div className="flex items-start justify-between">
+                                    <div className="truncate pr-2">
+                                        <h4 className="text-sm font-black text-text-main group-hover:text-primary transition-colors truncate uppercase tracking-tight">{room.name}</h4>
+                                        <p className="text-[10px] text-text-main-muted font-bold uppercase tracking-widest mt-0.5">
+                                            {room.members} connected • {room.ping}
+                                        </p>
+                                    </div>
+                                    <span className={cn(
+                                        "text-[9px] font-black tracking-widest uppercase px-2 py-0.5 rounded shrink-0",
+                                        room.type === 'public' ? "text-green-500 bg-green-500/10" : "text-primary bg-primary/10"
+                                    )}>
+                                        {room.type}
+                                    </span>
+                                </div>
+
+                                <div className="flex -space-x-2">
+                                    {(room.participants || []).map((participant) => (
+                                        <div key={participant.id} className="w-7 h-7 rounded-full border-2 border-background bg-surface overflow-hidden">
+                                            <img src={participant.avatar} alt={participant.name} className="w-full h-full object-cover" />
+                                        </div>
+                                    ))}
+                                    {room.members > 3 && (
+                                        <div className="w-7 h-7 rounded-full border-2 border-background bg-surface flex items-center justify-center text-[8px] font-bold text-text-main-muted">
+                                            +{room.members - 3}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <button
+                                    onClick={() => navigate(`/join/${room.id}`)}
+                                    className={cn(
+                                        "w-full py-3 rounded-xl text-[10px] font-black transition-all flex items-center justify-center gap-2 relative active:scale-[0.98] uppercase tracking-widest",
+                                        room.type === 'private'
+                                            ? "bg-black/5 dark:bg-white/5 text-text-main-muted hover:text-text-main border border-border"
+                                            : "bg-primary text-background hover:shadow-neon shadow-lg"
+                                    )}
+                                >
+                                    {room.type === 'private' ? <Lock size={12} className="opacity-60" /> : <ChevronRight size={14} />}
+                                    {room.type === 'private' ? 'Request Access' : 'Join Room'}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </motion.div>
+            </div>
+
+            <div className="mt-12 text-center">
+                <p className="text-[9px] font-bold text-primary/20 uppercase tracking-[0.5em] px-6">Secure Local Subnet P2P Gateway Active</p>
+            </div>
+        </div >
+    );
+};
+
+export default Rooms;

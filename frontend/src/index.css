@@ -1,0 +1,98 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-primary: var(--accent-color);
+  --color-secondary: #a020f0;
+  --color-neon-blue: var(--accent-color);
+  --color-text-main: var(--text-primary);
+  --color-text-muted: var(--text-secondary);
+  --color-border: var(--border-color);
+
+  --font-inter: "Inter", sans-serif;
+
+  --shadow-neon: 0 0 10px rgba(var(--accent-color-rgb), 0.2);
+  --shadow-glow: 0 0 15px rgba(var(--accent-color-rgb), 0.4);
+  --shadow-hero: 0 0 30px rgba(var(--accent-color-rgb), 0.4);
+  --shadow-inner-white: 0 -1px 0 rgba(255, 255, 255, 0.05);
+
+  --animate-radar-pulse: radar-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  @keyframes radar-pulse {
+
+    0%,
+    100% {
+      opacity: 0.1;
+      transform: scale(1);
+    }
+
+    50% {
+      opacity: 0.3;
+      transform: scale(1.2);
+    }
+  }
+
+  --animate-radar-spin: radar-spin 4s linear infinite;
+  --animate-spin-slow: spin 3s linear infinite;
+
+  @keyframes radar-spin {
+    from {
+      transform: rotate(0deg);
+    }
+
+    to {
+      transform: rotate(360deg);
+    }
+  }
+}
+
+:root {
+  --background: #f8fafc;
+  --surface: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --accent-color: #00f0ff;
+  --accent-color-rgb: 0, 240, 255;
+  --border-color: rgba(0, 0, 0, 0.05);
+  color-scheme: light;
+}
+
+.dark {
+  --background: #0a0d11;
+  --surface: #12161c;
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --border-color: rgba(255, 255, 255, 0.005);
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-background text-text-main font-inter antialiased;
+}
+
+/* Custom Utilities */
+.glass-panel {
+  @apply bg-surface/80 backdrop-blur-md border border-white/[0.02];
+}
+
+.neon-border {
+  @apply border border-primary/50 shadow-neon;
+}
+
+.neon-glow {
+  @apply shadow-glow;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-white/10 rounded-full hover:bg-white/20 transition-colors;
+}
