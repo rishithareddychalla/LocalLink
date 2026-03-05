@@ -50,7 +50,7 @@ const useNetwork = () => {
         if (showLoading) setIsScanning(true);
 
         try {
-            const response = await fetch('http://localhost:5000/api/network/devices');
+            const response = await fetch(`http://${window.location.hostname}:5000/api/network/devices`);
             if (response.ok) {
                 const data = await response.json();
                 setLanIp(data.localIp || '');
@@ -82,7 +82,7 @@ const useNetwork = () => {
         setIsScanning(true);
 
         try {
-            const response = await fetch('http://localhost:5000/api/network/scan');
+            const response = await fetch(`http://${window.location.hostname}:5000/api/network/scan`);
             if (response.ok) {
                 const data = await response.json();
                 setScannedDevices(data.devices || []);

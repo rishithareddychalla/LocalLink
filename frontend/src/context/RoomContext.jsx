@@ -27,7 +27,7 @@ import { useFiles } from './FileContext';
 
 const RoomContext = createContext();
 
-const SOCKET_URL = 'http://localhost:5000';
+
 
 export const RoomProvider = ({ children }) => {
     const [activeRoom, setActiveRoom] = useState(null);
@@ -104,10 +104,10 @@ export const RoomProvider = ({ children }) => {
 
     // Socket Initialization
     useEffect(() => {
-        socketRef.current = io(SOCKET_URL, {
-            autoConnect: false
+        socketRef.current = io(`http://${window.location.hostname}:5000`, {
+            autoConnect: false,
+            reconnectionAttempts: 5
         });
-
         socketRef.current.on('connect', () => {
             console.log('Connected to signaling server');
             if (profile.id) {

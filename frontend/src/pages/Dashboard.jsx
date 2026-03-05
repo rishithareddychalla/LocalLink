@@ -7,6 +7,7 @@ import NetworkStatusBar from '../components/dashboard/NetworkStatusBar';
 import DeviceGrid from '../components/dashboard/DeviceGrid';
 import ActiveRoomsPanel from '../components/dashboard/ActiveRoomsPanel';
 import ActiveSessionBanner from '../components/dashboard/ActiveSessionBanner';
+import InviteQRModal from '../components/InviteQRModal';
 
 const Dashboard = () => {
     const { profile } = useProfile();
@@ -26,6 +27,7 @@ const Dashboard = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedDevice, setSelectedDevice] = useState(null);
     const [isCreateRoomOpen, setIsCreateRoomOpen] = useState(false);
+    const [isInviteOpen, setIsInviteOpen] = useState(false);
 
     // Derived State: Filtering devices (Implementation of requirement 4)
     const filteredDevices = useMemo(() => {
@@ -54,6 +56,7 @@ const Dashboard = () => {
                     nodeCount={devices.length}
                     isScanning={isScanning}
                     onScan={scanSubnet}
+                    onInvite={() => setIsInviteOpen(true)}
                     searchQuery={searchQuery}
                     onSearchChange={setSearchQuery}
                 />
@@ -63,6 +66,7 @@ const Dashboard = () => {
                     devices={filteredDevices}
                     isScanning={isScanning}
                     onScan={scanSubnet}
+                    onInvite={() => setIsInviteOpen(true)}
                 />
             </div>
 
@@ -71,6 +75,14 @@ const Dashboard = () => {
                 rooms={rooms}
                 loading={loadingRooms}
                 error={roomsError}
+                onInvite={() => setIsInviteOpen(true)}
+            />
+
+            {/* Invitation QR Modal */}
+            <InviteQRModal
+                isOpen={isInviteOpen}
+                onClose={() => setIsInviteOpen(false)}
+                lanIp={lanIp}
             />
         </div>
     );

@@ -1,7 +1,7 @@
 import React from 'react';
 import { RefreshCw, UserPlus, HelpCircle, CheckCircle2, Circle } from 'lucide-react';
 
-const RadarScanner = ({ onScan }) => {
+const RadarScanner = ({ onScan, onInvite }) => {
     return (
         <div className="flex flex-col items-center justify-center py-12 px-4 max-w-2xl mx-auto">
             {/* Radar Animation */}
@@ -37,7 +37,10 @@ const RadarScanner = ({ onScan }) => {
                     <RefreshCw size={20} className="animate-spin-slow" />
                     Refresh Radar
                 </button>
-                <button className="flex items-center gap-3 bg-text/5 hover:bg-text/10 text-text-main-muted hover:text-text-main border border-border px-8 py-3.5 rounded-full font-bold transition-all active:scale-95">
+                <button
+                    onClick={onInvite}
+                    className="flex items-center gap-3 bg-text/5 hover:bg-text/10 text-text-main-muted hover:text-text-main border border-border px-8 py-3.5 rounded-full font-bold transition-all active:scale-95"
+                >
                     <UserPlus size={20} className="text-primary" />
                     Invite Others
                 </button>

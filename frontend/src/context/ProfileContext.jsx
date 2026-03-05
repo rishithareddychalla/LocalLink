@@ -1,13 +1,14 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { useNetworkLog } from './NetworkLogContext';
 import { apiRequest } from '../services/api';
+import { getUUID } from '../utils/uuid';
 
 const ProfileContext = createContext();
 
 const defaultProfile = {
     nickname: '',
     avatarStyle: 'bottts-neutral',
-    avatarSeed: crypto.randomUUID(),
+    avatarSeed: getUUID(),
     ghostMode: false,
     telemetryEnabled: false,
 };
@@ -21,7 +22,7 @@ export const ProfileProvider = ({ children }) => {
             try {
                 const parsed = JSON.parse(savedProfile);
                 if (!parsed.avatarSeed) {
-                    parsed.avatarSeed = parsed.nickname || crypto.randomUUID();
+                    parsed.avatarSeed = parsed.nickname || getUUID();
                 }
                 if (!parsed.avatarStyle) {
                     parsed.avatarStyle = 'bottts-neutral';

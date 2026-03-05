@@ -2,9 +2,9 @@ import React from 'react';
 import DeviceCard from './DeviceCard';
 import RadarScanner from './RadarScanner';
 
-const DeviceGrid = ({ devices, isScanning, onScan }) => {
+const DeviceGrid = ({ devices, isScanning, onScan, onInvite }) => {
     if (devices.length === 0 || isScanning) {
-        return <RadarScanner onScan={onScan} />;
+        return <RadarScanner onScan={onScan} onInvite={onInvite} />;
     }
 
     return (

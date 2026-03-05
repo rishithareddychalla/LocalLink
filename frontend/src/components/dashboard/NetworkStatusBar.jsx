@@ -1,5 +1,4 @@
-import React from 'react';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, QrCode, Share2 } from 'lucide-react';
 
 const NetworkStatusBar = ({
     nickname,
@@ -9,6 +8,7 @@ const NetworkStatusBar = ({
     nodeCount,
     isScanning,
     onScan,
+    onInvite,
     searchQuery,
     onSearchChange
 }) => {
@@ -51,16 +51,25 @@ const NetworkStatusBar = ({
                 </div>
             </div>
 
-            {/* Search Bar */}
-            <div className="relative group max-w-md">
-                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-main-muted group-focus-within:text-primary transition-colors" />
-                <input
-                    type="text"
-                    placeholder="Search devices by name or IP.."
-                    value={searchQuery}
-                    onChange={(e) => onSearchChange(e.target.value)}
-                    className="w-full bg-surface border border-border rounded-2xl py-4 pl-12 pr-6 text-xs font-bold tracking-widest text-text-main placeholder:text-text-main-muted/30 focus:outline-none focus:border-primary/30 focus:shadow-glow-sm transition-all uppercase"
-                />
+            {/* Search Bar & Invite Button */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between">
+                <div className="relative group flex-1 max-w-md">
+                    <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-text-main-muted group-focus-within:text-primary transition-colors" />
+                    <input
+                        type="text"
+                        placeholder="Search devices by name or IP.."
+                        value={searchQuery}
+                        onChange={(e) => onSearchChange(e.target.value)}
+                        className="w-full bg-surface border border-border rounded-2xl py-4 pl-12 pr-6 text-xs font-bold tracking-widest text-text-main placeholder:text-text-main-muted/30 focus:outline-none focus:border-primary/30 focus:shadow-glow-sm transition-all uppercase"
+                    />
+                </div>
+                <button
+                    onClick={onInvite}
+                    className="px-6 py-4 rounded-2xl border border-primary/20 bg-primary/20 text-primary text-[10px] font-black uppercase tracking-widest hover:bg-primary/30 transition-all active:scale-95 flex items-center justify-center gap-3 group whitespace-nowrap"
+                >
+                    <Share2 size={14} className="group-hover:rotate-12 transition-transform" />
+                    Invite Others
+                </button>
             </div>
         </div>
     );

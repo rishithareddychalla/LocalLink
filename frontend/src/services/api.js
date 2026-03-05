@@ -1,4 +1,4 @@
-const BASE_URL = 'http://localhost:5000/api';
+const BASE_URL = `http://${window.location.hostname}:5000/api`;
 
 export const apiRequest = async (endpoint, options = {}) => {
     const token = localStorage.getItem('llr_session_token');

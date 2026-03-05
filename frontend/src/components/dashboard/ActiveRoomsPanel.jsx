@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, AlertTriangle, Loader2, Search } from 'lucide-react';
+import { Lock, AlertTriangle, Loader2, Search, QrCode } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -8,7 +8,7 @@ function cn(...inputs) {
     return twMerge(clsx(inputs));
 }
 
-const ActiveRoomsPanel = ({ rooms, loading, error }) => {
+const ActiveRoomsPanel = ({ rooms, loading, error, onInvite }) => {
     const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = React.useState('');
 
@@ -21,11 +21,20 @@ const ActiveRoomsPanel = ({ rooms, loading, error }) => {
         <div className="w-full xl:w-80 flex flex-col pt-2 border-t xl:border-t-0 xl:border-l border-border xl:pl-8 mt-4 xl:mt-0 xl:overflow-y-auto custom-scrollbar">
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg font-bold text-text-main tracking-tight uppercase italic">Active Nodes</h2>
-                {!loading && !error && (
-                    <span className="text-[10px] font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full animate-pulse blur-[0.2px]">
-                        {rooms.length} LIVE
-                    </span>
-                )}
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={onInvite}
+                        title="Show Invitation QR"
+                        className="p-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                    >
+                        <QrCode size={16} />
+                    </button>
+                    {!loading && !error && (
+                        <span className="text-[10px] font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full animate-pulse blur-[0.2px]">
+                            {rooms.length} LIVE
+                        </span>
+                    )}
+                </div>
             </div>
 
             {/* Search Bar */}

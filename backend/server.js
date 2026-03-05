@@ -5,6 +5,7 @@ const cors = require('cors');
 require('dotenv').config();
 
 const socketHandler = require('./sockets/socketHandler');
+const getLocalIP = require('./utils/getLocalIP');
 
 // Routes
 const authRoutes = require('./routes/authRoutes');
@@ -25,7 +26,11 @@ const io = socketIo(server, {
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true
+}));
 app.use(express.json());
 app.use('/uploads', express.static('uploads'));
 
@@ -47,6 +52,9 @@ app.get('/', (req, res) => {
     res.json({ success: true, message: 'LocalLink In-Memory Backend API' });
 });
 
-server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+    const lanIP = getLocalIP();
+    console.log(`\x1b[32m%s\x1b[0m`, `LocalLink Backend running!`);
+    console.log(`- Local:   http://localhost:${PORT}`);
+    console.log(`- Network: http://${lanIP}:${PORT}`);
 });
