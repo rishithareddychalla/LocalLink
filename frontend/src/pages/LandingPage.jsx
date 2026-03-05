@@ -97,11 +97,11 @@ const LandingPage = () => {
             <section className="w-full flex justify-center items-center py-10 md:py-20 pointer-events-none z-0 overflow-hidden">
                 <div className="relative w-[320px] sm:w-[500px] md:w-[800px] aspect-square flex justify-center items-center flex-shrink-0 scale-75 md:scale-100">
                     {/* Concentric Circles */}
-                    <div className="absolute inset-0 border border-border/20 rounded-full scale-[0.4]" />
-                    <div className="absolute inset-0 border border-border/20 rounded-full scale-[0.6]" />
-                    <div className="absolute inset-0 border border-border/20 rounded-full scale-[0.8]" />
-                    <div className="absolute inset-0 border border-border/20 rounded-full scale-100" />
-                    <div className="absolute inset-0 border border-border/20 rounded-full scale-[1.2]" />
+                    <div className="absolute inset-0 border border-primary/20 rounded-full scale-[0.4]" />
+                    <div className="absolute inset-0 border border-primary/20 rounded-full scale-[0.6]" />
+                    <div className="absolute inset-0 border border-primary/20 rounded-full scale-[0.8]" />
+                    <div className="absolute inset-0 border border-primary/20 rounded-full scale-100" />
+                    <div className="absolute inset-0 border border-primary/20 rounded-full scale-[1.2]" />
 
                     {/* Animated Pulse */}
                     <div className="absolute inset-x-0 inset-y-0 m-auto w-24 h-24 md:w-32 md:h-32 border-2 border-primary/30 rounded-full animate-radar-pulse" />

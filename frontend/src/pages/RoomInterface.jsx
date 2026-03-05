@@ -37,6 +37,8 @@ import SharedFilesModal from '../components/UI/SharedFilesModal';
 import { useRoom } from '../context/RoomContext';
 import { useFiles } from '../context/FileContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useProfile } from '../context/ProfileContext';
+import { useNetworkLog } from '../context/NetworkLogContext';
 import { useNavigate } from 'react-router-dom';
 import { useDrawpad } from '../hooks/useDrawpad';
 import { useClickOutside } from '../hooks/useClickOutside';
@@ -54,6 +56,8 @@ const RoomInterface = () => {
         participants,
         roomMetadata,
         roomFiles,
+        chatMessages,
+        sendMessage,
         timeLeft,
         userRoomPreferences,
         pendingRequests,
@@ -62,9 +66,21 @@ const RoomInterface = () => {
     } = useRoom();
 
     const { trackDownload, isBlocked } = useFiles();
+    const { profile } = useProfile();
+    const { addLogEvent } = useNetworkLog();
     const { notifications, unreadCount, markAsRead, clearNotifications } = useNotifications();
     const [showNotifications, setShowNotifications] = useState(false);
     const notificationRef = useRef(null);
+
+    const chatEndRef = useRef(null);
+
+    const scrollToBottom = () => {
+        chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [chatMessages]);
 
     useClickOutside(notificationRef, () => {
         if (showNotifications) setShowNotifications(false);
@@ -117,9 +133,16 @@ const RoomInterface = () => {
     const getUserTheme = (userName) => {
         if (userName === 'Me') return activeTheme;
         const p = participants.find(part =>
-            part.name === userName || part.name.split(' ')[0] === userName
+            part.nickname === userName || part.nickname?.split(' ')[0] === userName
         );
-        return p ? p.theme : '#3B82F6';
+        return p?.accentColor || '#3B82F6';
+    };
+
+    const handleSendMessage = (e) => {
+        if (e && e.key && e.key !== 'Enter') return;
+        if (!message.trim()) return;
+        sendMessage(message);
+        setMessage('');
     };
 
     const ChatPanel = () => (
@@ -133,25 +156,32 @@ const RoomInterface = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-6 no-scrollbar">
-                {MOCK_CHATS.map((chat) => {
+                {chatMessages.length === 0 && (
+                    <div className="h-full flex flex-col items-center justify-center opacity-20 py-8">
+                        <MessageSquare size={32} className="mb-2" />
+                        <p className="text-[10px] font-bold uppercase tracking-widest">No messages yet</p>
+                    </div>
+                )}
+                {chatMessages.map((chat) => {
+                    const isMe = chat.userId === profile.id;
                     const userTheme = getUserTheme(chat.user);
                     return (
-                        <div key={chat.id} className={cn("flex flex-col", chat.user === 'Me' ? "items-end" : "items-start")}>
+                        <div key={chat.id} className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
                             <div className="flex items-center gap-1.5 mb-1 awareness-indicator">
                                 <span className="text-[10px] font-bold text-text-main-muted">{chat.user}</span>
-                                {chat.user !== 'Me' && <div className="w-1 h-1 rounded-full animate-pulse" style={{ backgroundColor: userTheme }} />}
+                                {!isMe && <div className="w-1 h-1 rounded-full animate-pulse" style={{ backgroundColor: userTheme }} />}
                             </div>
                             <div
                                 className={cn(
                                     "px-4 py-2.5 text-sm max-w-[85%] shadow-lg transition-all hover:scale-[1.02]",
-                                    chat.user === 'Me'
+                                    isMe
                                         ? "text-black font-semibold rounded-2xl rounded-tr-sm"
                                         : "text-text-main/90 rounded-2xl rounded-tl-sm border border-border"
                                 )}
                                 style={{
-                                    backgroundColor: chat.user === 'Me' ? userTheme : `${userTheme}15`,
-                                    borderColor: chat.user === 'Me' ? 'transparent' : `${userTheme}30`,
-                                    boxShadow: chat.user === 'Me' ? `0 10px 15px -3px ${userTheme}40` : 'none'
+                                    backgroundColor: isMe ? activeTheme : `${userTheme}15`,
+                                    borderColor: isMe ? 'transparent' : `${userTheme}30`,
+                                    boxShadow: isMe ? `0 10px 15px -3px ${activeTheme}40` : 'none'
                                 }}
                             >
                                 {chat.message}
@@ -159,6 +189,7 @@ const RoomInterface = () => {
                         </div>
                     );
                 })}
+                <div ref={chatEndRef} />
             </div>
 
             <div className="p-4 bg-background border-t border-border relative">
@@ -166,6 +197,7 @@ const RoomInterface = () => {
                     type="text"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
+                    onKeyDown={handleSendMessage}
                     placeholder="Message..."
                     className="w-full bg-surface border border-border/50 rounded-full py-3.5 pl-5 pr-12 text-sm text-text-main focus:outline-none transition-colors placeholder:text-text-main-muted/20"
                     style={{ borderColor: `${activeTheme}20` }}
@@ -173,6 +205,7 @@ const RoomInterface = () => {
                     onBlur={(e) => e.target.style.borderColor = ''}
                 />
                 <button
+                    onClick={() => handleSendMessage()}
                     className="absolute right-6 top-1/2 -translate-y-1/2 w-8 h-8 text-black rounded-full flex items-center justify-center hover:opacity-90 active:scale-90 transition-all"
                     style={{ backgroundColor: activeTheme }}
                 >

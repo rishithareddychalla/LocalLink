@@ -2,16 +2,16 @@ import React from 'react';
 import { Users, Search, Bell, Menu } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import useStore from '../../store/useStore';
-import { useSession } from '../../hooks/useSession';
 import { useNotifications } from '../../context/NotificationContext';
+import { useProfile } from '../../context/ProfileContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useClickOutside } from '../../hooks/useClickOutside';
 
 const Navbar = () => {
     const navigate = useNavigate();
     const { toggleSidebar } = useStore();
-    const { user } = useSession();
     const { notifications, unreadCount, markAsRead, clearNotifications } = useNotifications();
+    const { profile } = useProfile();
     const [showNotifications, setShowNotifications] = React.useState(false);
     const notificationRef = React.useRef(null);
 
@@ -38,15 +38,6 @@ const Navbar = () => {
             </div>
 
             <div className="flex items-center gap-6">
-                {/* <div className="hidden md:block relative group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-main-muted group-focus-within:text-text-main transition-colors" size={16} />
-                    <input
-                        type="text"
-                        placeholder="Search everything…"
-                        className="bg-background border border-border rounded-lg py-2 pl-10 pr-4 w-72 focus:outline-none focus:border-text-muted transition-all text-sm text-text-main placeholder:text-text-main-muted"
-                    />
-                </div> */}
-
                 <div className="flex items-center gap-3 md:gap-6" ref={notificationRef}>
                     <div className="relative">
                         <button
@@ -108,11 +99,11 @@ const Navbar = () => {
                         className="flex items-center gap-3 cursor-pointer group"
                     >
                         <div className="text-right group-hover:opacity-80 transition-opacity hidden sm:block">
-                            <p className="text-sm font-bold text-text-main truncate max-w-[100px]">{user?.nickname || 'Guest'}</p>
+                            <p className="text-sm font-bold text-text-main truncate max-w-[100px]">{profile?.nickname || 'Guest'}</p>
                             <p className="text-[10px] text-text-main-muted font-medium tracking-wide">Guest Session</p>
                         </div>
                         <div className="w-10 h-10 rounded-full bg-background overflow-hidden border border-border group-hover:border-primary transition-all active:scale-95 shadow-lg">
-                            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.nickname || 'Guest'}`} alt="Profile" className="w-full h-full object-cover" />
+                            <img src={profile?.avatar} alt="Profile" className="w-full h-full object-cover" />
                         </div>
                     </div>
                 </div>

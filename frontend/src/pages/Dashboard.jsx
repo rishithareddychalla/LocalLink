@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { useSession } from '../hooks/useSession';
 import { useRoom } from '../context/RoomContext';
+import { useProfile } from '../context/ProfileContext';
 import useNetwork from '../hooks/useNetwork';
 import useRooms from '../hooks/useRooms';
 import NetworkStatusBar from '../components/dashboard/NetworkStatusBar';
@@ -9,7 +9,7 @@ import ActiveRoomsPanel from '../components/dashboard/ActiveRoomsPanel';
 import ActiveSessionBanner from '../components/dashboard/ActiveSessionBanner';
 
 const Dashboard = () => {
-    const { user } = useSession();
+    const { profile } = useProfile();
     const { activeRoom } = useRoom();
     const {
         lanIp,
@@ -47,7 +47,7 @@ const Dashboard = () => {
 
                 {/* Header & Status */}
                 <NetworkStatusBar
-                    nickname={user?.nickname}
+                    nickname={profile.nickname}
                     lanIp={lanIp}
                     subnet={subnet}
                     connectionStatus={connectionStatus}

@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Menu, X, User } from 'lucide-react';
+import { useProfile } from '../../context/ProfileContext';
 
 const TopNavbar = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const { profile } = useProfile();
 
     const handleFeaturesClick = (e) => {
         if (location.pathname === '/') {
@@ -53,7 +55,7 @@ const TopNavbar = () => {
                     className="w-9 h-9 md:w-10 md:h-10 rounded-full border-2 border-border/50 overflow-hidden cursor-pointer hover:border-primary transition-all active:scale-95 shadow-lg bg-surface flex shrink-0"
                 >
                     <img
-                        src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=200"
+                        src={profile?.avatar}
                         alt="Profile"
                         className="w-full h-full object-cover"
                     />

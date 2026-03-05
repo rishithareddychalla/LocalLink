@@ -5,17 +5,13 @@ import { User, ArrowRight, Lock } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useRoom } from '../context/RoomContext';
+import { useProfile } from '../context/ProfileContext';
+import { useNetworkLog } from '../context/NetworkLogContext';
 import { getRoomAPI } from '../services/roomService';
 
 function cn(...inputs) {
     return twMerge(clsx(inputs));
 }
-
-const mockParticipants = [
-    { id: 1, name: 'Alex', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex' },
-    { id: 2, name: 'Sarah', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah' },
-    { id: 3, name: 'Mike', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Mike' },
-];
 
 const JoinRoom = () => {
     const { roomId } = useParams();
@@ -25,18 +21,39 @@ const JoinRoom = () => {
         userRoomPreferences,
         roomRegistry,
         NEARBY_ROOMS,
-        updatePreferences
+        updatePreferences,
+        joinRequestStatus,
+        setJoinRequestStatus
     } = useRoom();
+    const { profile, updateNickname } = useProfile();
+    const { addLogEvent } = useNetworkLog();
 
-    const [nickname, setNickname] = useState(userRoomPreferences?.nickname || '');
+    const [nickname, setNickname] = useState(profile.nickname || 'Guest');
     const [themeColor, setThemeColor] = useState(userRoomPreferences?.selectedTheme || '#2563EB');
     const [loadingRoom, setLoadingRoom] = useState(false);
     const [roomData, setRoomData] = useState(null);
     const [password, setPassword] = useState('');
-    const [joinStatus, setJoinStatus] = useState('idle'); // 'idle', 'pending', 'error'
     const [error, setError] = useState(null);
 
     const colors = ['#2563EB', '#3B82F6', '#10B981', '#7C3AED'];
+
+    // Find room details (Requirement 2 & 6)
+    const roomName = roomData?.name || (roomId?.startsWith('LL-') ? `Collaborative Session ${roomId.split('-')[1]}` : roomId) || 'Private Room';
+    const participantsList = roomData?.participants || [];
+    const isPrivate = roomData?.type === 'private' || roomData?.visibility === 'private' || !!roomData?.passwordHash;
+    const approvalRequired = roomData?.approvalRequired;
+
+    // Auto-navigate on approval
+    useEffect(() => {
+        if (joinRequestStatus === 'approved') {
+            addLogEvent(`Joined '${roomName}'`, `Networking enabled • ID: ${roomId}`);
+            setJoinRequestStatus('idle'); // Clear status for next time
+            navigate(`/room/${roomId}`);
+        } else if (joinRequestStatus === 'rejected') {
+            setError('Your join request was rejected by the room owner.');
+            setJoinRequestStatus('idle');
+        }
+    }, [joinRequestStatus, roomId, roomName, navigate, addLogEvent, setJoinRequestStatus]);
 
     // Fetch room details if not in nearby/registry
     useEffect(() => {
@@ -64,33 +81,30 @@ const JoinRoom = () => {
         fetchRoomDetails();
     }, [roomId, NEARBY_ROOMS, roomRegistry]);
 
-    // Find room details (Requirement 2 & 6)
-    const roomName = roomData?.name || (roomId?.startsWith('LL-') ? `Collaborative Session ${roomId.split('-')[1]}` : roomId) || 'Private Room';
-    const participantsList = roomData?.participants || [];
-    const isPrivate = roomData?.type === 'private' || roomData?.visibility === 'private' || !!roomData?.passwordHash;
-    const approvalRequired = roomData?.approvalRequired;
-
     const handleJoin = async (e) => {
         e.preventDefault();
         setError(null);
         if (nickname.trim()) {
             const userData = {
-                id: `u-${Date.now()}`, // Consistent ID for simulation
+                id: profile.id, // Use real profile ID
                 nickname,
                 password,
-                theme: themeColor
+                accentColor: themeColor,
+                avatarStyle: profile.avatarStyle,
+                avatarSeed: profile.avatarSeed
             };
 
             // Persist preferences
             updatePreferences({ nickname, selectedTheme: themeColor });
+            updateNickname(nickname);
 
             const response = await joinRoom(roomId, userData);
             if (response.success) {
-                if (response.status === 'pending') {
-                    setJoinStatus('pending');
-                } else {
+                if (response.status === 'joined') {
+                    addLogEvent(`Joined '${roomName}'`, `Networking enabled • ID: ${roomId}`);
                     navigate(`/room/${roomId}`);
                 }
+                // 'pending' is handled by joinRequestStatus effect
             } else {
                 setError(response.error || 'Failed to join room');
             }
@@ -219,7 +233,7 @@ const JoinRoom = () => {
 
                     {/* Pending Approval Overlay (Requirement 3 & 4) */}
                     <AnimatePresence>
-                        {joinStatus === 'pending' && (
+                        {joinRequestStatus === 'pending' && (
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -238,7 +252,7 @@ const JoinRoom = () => {
                                     <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0.4s' }} />
                                 </div>
                                 <button
-                                    onClick={() => setJoinStatus('idle')}
+                                    onClick={() => setJoinRequestStatus('idle')}
                                     className="text-[10px] font-black text-text-main-muted/20 uppercase tracking-[0.3em] hover:text-text-main-muted transition-colors"
                                 >
                                     Cancel Request
@@ -254,15 +268,15 @@ const JoinRoom = () => {
                         participantsList.length > 0 ? (
                             <>
                                 <div className="flex -space-x-3 mb-3">
-                                    {participantsList.map((p) => (
-                                        <div key={p.id} className="w-10 h-10 rounded-full border-2 border-surface overflow-hidden bg-surface relative z-10 hover:z-20 transition-all hover:-translate-y-1">
-                                            <img src={p.avatar} alt={p.name} className="w-full h-full object-cover" />
+                                    {participantsList.map((p, idx) => (
+                                        <div key={p.id || idx} className="w-10 h-10 rounded-full border-2 border-surface overflow-hidden bg-surface relative z-10 hover:z-20 transition-all hover:-translate-y-1">
+                                            <img src={`https://api.dicebear.com/7.x/${p.avatarStyle || 'avataaars'}/svg?seed=${p.avatarSeed || p.nickname}`} alt={p.nickname} className="w-full h-full object-cover" />
                                         </div>
                                     ))}
                                 </div>
                                 <p className="text-xs text-text-main-muted">
                                     <span className="text-text-main/80 font-medium">
-                                        {participantsList.slice(0, 2).map(p => p.name).join(', ')}
+                                        {participantsList.slice(0, 2).map(p => p.nickname).join(', ')}
                                         {participantsList.length > 2 ? ` and ${participantsList.length - 2} others` : ''}
                                     </span> are already in the room
                                 </p>

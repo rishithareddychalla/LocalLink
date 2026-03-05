@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, ArrowRight, Loader2 } from 'lucide-react';
 import { useSession } from '../hooks/useSession';
+import { useProfile } from '../context/ProfileContext';
 import { useNavigate } from 'react-router-dom';
 
 const AuthModal = ({ isOpen, onClose }) => {
     const [nickname, setNickname] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const { login } = useSession();
+    const { profile, updateNickname } = useProfile();
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
@@ -16,7 +18,12 @@ const AuthModal = ({ isOpen, onClose }) => {
 
         setIsLoading(true);
         try {
-            await login(nickname);
+            await login({
+                nickname,
+                avatarStyle: profile.avatarStyle,
+                avatarSeed: profile.avatarSeed
+            });
+            updateNickname(nickname);
             onClose();
             navigate('/dashboard');
         } catch (error) {

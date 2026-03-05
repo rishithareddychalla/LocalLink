@@ -81,23 +81,6 @@ const Sidebar = () => {
                 })}
             </nav>
 
-            {/* Storage Display */}
-            <div className="p-4 shrink-0 mt-auto bg-background border-t border-border">
-                <div className="bg-surface p-4 rounded-xl border border-border">
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="text-xs text-text-main-muted font-bold uppercase tracking-wider">Storage</span>
-                        <span className="text-xs font-bold text-primary">45%</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-background rounded-full overflow-hidden">
-                        <div className="h-full bg-primary w-[45%] rounded-full shadow-[0_0_10px_var(--accent-color)] relative">
-                            <div className="absolute inset-0 bg-white/30 w-1/2 rounded-full blur-[2px] right-0" />
-                        </div>
-                    </div>
-                    <div className="mt-2 text-xs text-text-main-muted">
-                        <span className="text-text-main">45 GB</span> / 100 GB Used
-                    </div>
-                </div>
-            </div>
         </aside>
     );
 };

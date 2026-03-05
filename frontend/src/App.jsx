@@ -17,48 +17,54 @@ import { RoomProvider } from './context/RoomContext';
 import { FileProvider } from './context/FileContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { SettingsProvider } from './context/SettingsContext';
+import { ProfileProvider } from './context/ProfileContext';
+import { NetworkLogProvider } from './context/NetworkLogContext';
 
 const App = () => {
   return (
     <SettingsProvider>
-      <SessionProvider>
-        <NotificationProvider>
-          <FileProvider>
-            <RoomProvider>
-              <Routes>
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/documentation" element={<Documentation />} />
+      <NetworkLogProvider>
+        <ProfileProvider>
+          <SessionProvider>
+            <NotificationProvider>
+              <FileProvider>
+                <RoomProvider>
+                  <Routes>
+                    <Route path="/" element={<LandingPage />} />
+                    <Route path="/documentation" element={<Documentation />} />
 
-                {/* Protected Routes */}
-                <Route path="/profile" element={
-                  <ProtectedRoute>
-                    <Profile />
-                  </ProtectedRoute>
-                } />
+                    {/* Protected Routes */}
+                    <Route path="/profile" element={
+                      <ProtectedRoute>
+                        <Profile />
+                      </ProtectedRoute>
+                    } />
 
-                <Route path="/join/:roomId" element={
-                  <ProtectedRoute>
-                    <JoinRoom />
-                  </ProtectedRoute>
-                } />
+                    <Route path="/join/:roomId" element={
+                      <ProtectedRoute>
+                        <JoinRoom />
+                      </ProtectedRoute>
+                    } />
 
-                <Route element={
-                  <ProtectedRoute>
-                    <MainLayout />
-                  </ProtectedRoute>
-                }>
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/rooms" element={<Rooms />} />
-                  <Route path="/room/:roomId" element={<RoomInterface />} />
-                  <Route path="/files" element={<FilesManagement />} />
-                  <Route path="/quiz" element={<QuizMode />} />
-                  <Route path="/settings" element={<Settings />} />
-                </Route>
-              </Routes>
-            </RoomProvider>
-          </FileProvider>
-        </NotificationProvider>
-      </SessionProvider>
+                    <Route element={
+                      <ProtectedRoute>
+                        <MainLayout />
+                      </ProtectedRoute>
+                    }>
+                      <Route path="/dashboard" element={<Dashboard />} />
+                      <Route path="/rooms" element={<Rooms />} />
+                      <Route path="/room/:roomId" element={<RoomInterface />} />
+                      <Route path="/files" element={<FilesManagement />} />
+                      <Route path="/quiz" element={<QuizMode />} />
+                      <Route path="/settings" element={<Settings />} />
+                    </Route>
+                  </Routes>
+                </RoomProvider>
+              </FileProvider>
+            </NotificationProvider>
+          </SessionProvider>
+        </ProfileProvider>
+      </NetworkLogProvider>
     </SettingsProvider>
   );
 };

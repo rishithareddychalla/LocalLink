@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
-import { getToken, setToken, removeToken, getNicknameFromToken, generateMockToken } from '../utils/token';
+import { getToken, setToken, removeToken, getNicknameFromToken } from '../utils/token';
+import { apiRequest } from '../services/api';
 
 export const SessionContext = createContext(null);
 
@@ -15,28 +16,41 @@ export const SessionProvider = ({ children }) => {
         if (storedToken) {
             const nickname = getNicknameFromToken(storedToken);
             if (nickname) {
+                // In a real app we might fetch the full user profile here
                 setUser({ nickname });
                 setTokenState(storedToken);
                 setIsAuthenticated(true);
             } else {
-                // Token invalid or expired
                 removeToken();
             }
         }
         setIsInitializing(false);
     }, []);
 
-    const login = useCallback(async (nickname) => {
-        // Simulate backend latency
-        await new Promise(resolve => setTimeout(resolve, 1000));
+    const login = useCallback(async (profileData) => {
+        try {
+            const response = await apiRequest('/auth/login', {
+                method: 'POST',
+                body: JSON.stringify({
+                    nickname: profileData.nickname,
+                    avatarStyle: profileData.avatarStyle,
+                    avatarSeed: profileData.avatarSeed
+                })
+            });
 
-        const mockToken = generateMockToken(nickname);
-        setToken(mockToken);
-        setTokenState(mockToken);
-        setUser({ nickname });
-        setIsAuthenticated(true);
-
-        return { success: true };
+            if (response.success) {
+                const { token: newToken, ...userData } = response.data;
+                setToken(newToken);
+                setTokenState(newToken);
+                setUser(userData);
+                setIsAuthenticated(true);
+                return { success: true };
+            }
+            return { success: false, error: response.error };
+        } catch (error) {
+            console.error('Login error:', error);
+            return { success: false, error: error.message };
+        }
     }, []);
 
     const logout = useCallback(() => {
