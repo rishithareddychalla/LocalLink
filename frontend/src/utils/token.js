@@ -1,4 +1,4 @@
-const TOKEN_KEY = 'llr_token';
+const TOKEN_KEY = 'llr_session_token';
 
 /**
  * Generates a mock JWT-like string for the session.

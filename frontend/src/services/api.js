@@ -2,6 +2,7 @@ const BASE_URL = `http://${window.location.hostname}:5000/api`;
 
 export const apiRequest = async (endpoint, options = {}) => {
     const token = localStorage.getItem('llr_session_token');
+    console.log(`[API] Request to ${endpoint}. Token found: ${!!token} (${token ? token.substring(0, 5) : 'none'}...)`);
 
     const headers = {
         'Content-Type': 'application/json',
@@ -13,6 +14,12 @@ export const apiRequest = async (endpoint, options = {}) => {
         ...options,
         headers
     });
+
+    if (response.status === 401) {
+        window.dispatchEvent(new CustomEvent('llr_unauthorized'));
+        const data = await response.json();
+        throw new Error(data.error || 'Unauthorized');
+    }
 
     const data = await response.json();
 
@@ -33,6 +40,12 @@ export const apiUpload = async (endpoint, formData) => {
         },
         body: formData
     });
+
+    if (response.status === 401) {
+        window.dispatchEvent(new CustomEvent('llr_unauthorized'));
+        const data = await response.json();
+        throw new Error(data.error || 'Unauthorized');
+    }
 
     const data = await response.json();
 

@@ -6,6 +6,7 @@ import { getUUID } from '../utils/uuid';
 const ProfileContext = createContext();
 
 const defaultProfile = {
+    id: getUUID(),
     nickname: '',
     avatarStyle: 'bottts-neutral',
     avatarSeed: getUUID(),

@@ -8,26 +8,38 @@ import { useNavigate } from 'react-router-dom';
 const AuthModal = ({ isOpen, onClose }) => {
     const [nickname, setNickname] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState(null); // Added error state
     const { login } = useSession();
     const { profile, updateNickname } = useProfile();
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!nickname.trim()) return;
+        if (!nickname.trim()) {
+            setError('Nickname cannot be empty.');
+            return;
+        }
 
         setIsLoading(true);
+        setError(null); // Clear previous errors
         try {
-            await login({
+            const result = await login({
+                id: profile.id,
                 nickname,
                 avatarStyle: profile.avatarStyle,
                 avatarSeed: profile.avatarSeed
             });
-            updateNickname(nickname);
-            onClose();
-            navigate('/dashboard');
+
+            if (result.success) {
+                updateNickname(nickname);
+                onClose();
+                navigate('/dashboard');
+            } else {
+                setError(result.error || 'Failed to initialize session');
+            }
         } catch (error) {
             console.error('Session creation failed', error);
+            setError(error.message || 'An unexpected error occurred.');
         } finally {
             setIsLoading(false);
         }
@@ -71,6 +83,16 @@ const AuthModal = ({ isOpen, onClose }) => {
                                 <h2 className="text-2xl font-black text-text-main italic uppercase tracking-tight">Identity Required</h2>
                                 <p className="text-text-main-muted/40 text-xs font-bold uppercase tracking-widest">SUB-NET GUEST PROTOCOL</p>
                             </div>
+
+                            {error && (
+                                <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-red-500 text-[10px] font-bold text-center uppercase tracking-wider"
+                                >
+                                    {error}
+                                </motion.div>
+                            )}
 
                             <form onSubmit={handleSubmit} className="space-y-6">
                                 <div className="space-y-2">

@@ -9,6 +9,7 @@ import {
     Wifi,
     ChevronRight,
     Copy,
+    Check,
     ArrowRight,
     QrCode,
     Lock,
@@ -19,21 +20,29 @@ import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useRoom } from '../context/RoomContext';
+import { useProfile } from '../context/ProfileContext';
 import { useSettings } from '../context/SettingsContext';
 import { useNotifications } from '../context/NotificationContext';
 import RoomInterface from './RoomInterface';
+import useRooms from '../hooks/useRooms';
+
+function cn(...inputs) {
+    return twMerge(clsx(inputs));
+}
 
 const Rooms = () => {
     const navigate = useNavigate();
     const {
         activeRoom,
         createRoom,
+        joinRoom, // Added joinRoom
         userRoomPreferences,
         updatePreferences,
-        generatedId,
-        NEARBY_ROOMS
+        generatedId
     } = useRoom();
 
+    const { rooms } = useRooms();
+    const { profile } = useProfile();
     const { settings } = useSettings();
     const { addNotification } = useNotifications();
 
@@ -42,7 +51,6 @@ const Rooms = () => {
     const [isPrivate, setIsPrivate] = useState(false);
     const [password, setPassword] = useState('');
     const [expiry, setExpiry] = useState(userRoomPreferences.lastExpirySelected || '1min');
-    const [approvalRequired, setApprovalRequired] = useState(false);
 
     // Join Room State
     const [roomCode, setRoomCode] = useState(userRoomPreferences.lastUsedRoomCode || '');
@@ -50,6 +58,7 @@ const Rooms = () => {
     const [createThemeColor, setCreateThemeColor] = useState(userRoomPreferences.selectedTheme || settings.accentColor);
     const [joinThemeColor, setJoinThemeColor] = useState(userRoomPreferences.selectedTheme || settings.accentColor);
     const [searchTermNearby, setSearchTermNearby] = useState('');
+    const [copied, setCopied] = useState(false);
 
     // Sync local theme color with global accent color if no local preference is set
     useEffect(() => {
@@ -69,10 +78,11 @@ const Rooms = () => {
         updatePreferences({ nickname, selectedTheme: createThemeColor });
 
         const roomData = {
+            id: generatedId,
             name: roomName,
+            isPrivate,
             password: isPrivate ? password : '',
             expiry,
-            approvalRequired,
             type: 'owner'
         };
 
@@ -93,15 +103,52 @@ const Rooms = () => {
         if (roomCode.trim()) {
             // Persist preferences before moving to JoinRoom page
             updatePreferences({ nickname, selectedTheme: joinThemeColor });
-            navigate(`/join/${roomCode}`);
+            navigate(`/join/${roomCode.trim().toUpperCase()}`);
         }
     };
+    const handleCopyId = () => {
+        if (!generatedId) return;
+        navigator.clipboard.writeText(generatedId);
+        setCopied(true);
+        addNotification({
+            type: 'info',
+            title: 'Copied',
+            message: 'Room ID copied to clipboard',
+            timestamp: new Date().toISOString()
+        });
+        setTimeout(() => setCopied(false), 2000);
+    };
 
-    const filteredNearbyRooms = NEARBY_ROOMS.filter(room =>
+    const handleJoinDirectly = async (room) => {
+        // Requirements: If room.isPrivate === false, join immediately
+        if (!room.isPrivate && nickname.trim()) {
+            const userData = {
+                id: profile.id, // Use profile ID
+                nickname,
+                accentColor: joinThemeColor,
+                avatarStyle: profile.avatarStyle,
+                avatarSeed: profile.avatarSeed
+            };
+
+            // Persist preferences
+            updatePreferences({ nickname, selectedTheme: joinThemeColor });
+
+            const response = await joinRoom(room.id, userData);
+            if (response.success) {
+                navigate(`/room/${room.id}`);
+                return;
+            }
+        }
+
+        // Otherwise go to JoinRoom page (for password entry or nickname setup)
+        navigate(`/join/${room.id}`);
+    };
+
+    const filteredNearbyRooms = (rooms || []).filter(room =>
         room.name.toLowerCase().includes(searchTermNearby.toLowerCase())
     );
 
-    const cn = (...inputs) => twMerge(clsx(inputs));
+
 
     return (
         <div className="min-h-full bg-background p-4 sm:p-6 md:p-0.5 pb-12 overflow-x-hidden">
@@ -191,34 +238,6 @@ const Rooms = () => {
                                 )}
                             </AnimatePresence>
 
-                            <div className="flex items-center justify-between p-4 bg-background border border-border rounded-2xl group transition-all cursor-pointer"
-                                onClick={() => setApprovalRequired(!approvalRequired)}
-                                style={{ borderColor: approvalRequired ? `${createThemeColor}2a` : 'var(--border-color)' }}>
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 rounded-xl transition-colors"
-                                        style={{
-                                            backgroundColor: approvalRequired ? `${createThemeColor}0d` : 'rgba(0,0,0,0.05)',
-                                            color: approvalRequired ? createThemeColor : 'var(--text-secondary)'
-                                        }}>
-                                        <Lock size={16} />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-bold text-text-main uppercase tracking-tight">Moderate Entry</p>
-                                        <p className="text-[9px] text-text-main-muted font-bold uppercase tracking-widest">Creator must approve all joiners</p>
-                                    </div>
-                                </div>
-                                <div
-                                    className="w-10 h-5 rounded-full transition-colors relative"
-                                    style={{ backgroundColor: approvalRequired ? createThemeColor : 'var(--border-color)' }}
-                                >
-                                    <motion.div
-                                        className="w-4 h-4 bg-white rounded-full absolute top-0.5 shadow-sm"
-                                        animate={{ left: approvalRequired ? "calc(100% - 18px)" : "2px" }}
-                                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                                    />
-                                </div>
-                            </div>
-
                             <div className="space-y-3">
                                 <label className="text-[10px] font-bold text-text-main-muted uppercase tracking-widest pl-1">Expiry Timer</label>
                                 <div className="grid grid-cols-3 gap-2 md:gap-3">
@@ -268,8 +287,12 @@ const Rooms = () => {
                                 <div className="w-full bg-background border rounded-2xl py-3.5 md:py-4 px-5 md:px-6 font-bold tracking-[0.2em] flex items-center justify-between text-xs md:text-sm transition-colors"
                                     style={{ color: createThemeColor, borderColor: `${createThemeColor}20` }}>
                                     <span>{generatedId}</span>
-                                    <button type="button" className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors">
-                                        <Copy size={16} />
+                                    <button
+                                        type="button"
+                                        onClick={handleCopyId}
+                                        className="p-1.5 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors"
+                                    >
+                                        {copied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
                                     </button>
                                 </div>
                             </div>
@@ -457,7 +480,7 @@ const Rooms = () => {
                                 </div>
 
                                 <button
-                                    onClick={() => navigate(`/join/${room.id}`)}
+                                    onClick={() => handleJoinDirectly(room)}
                                     className={cn(
                                         "w-full py-3 rounded-xl text-[10px] font-black transition-all flex items-center justify-center gap-2 relative active:scale-[0.98] uppercase tracking-widest",
                                         room.type === 'private'
@@ -466,7 +489,7 @@ const Rooms = () => {
                                     )}
                                 >
                                     {room.type === 'private' ? <Lock size={12} className="opacity-60" /> : <ChevronRight size={14} />}
-                                    {room.type === 'private' ? 'Request Access' : 'Join Room'}
+                                    {room.type === 'private' ? 'Enter Password' : 'Join Room'}
                                 </button>
                             </div>
                         ))}

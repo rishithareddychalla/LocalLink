@@ -1,5 +1,7 @@
-const { rooms, logs } = require('../store/memoryStore');
+const { logs } = require('../store/memoryStore');
 const deviceStore = require('../store/deviceStore');
+const roomStore = require('../store/roomStore');
+const { cleanupRoom } = require('../controllers/roomController');
 
 const addLog = (userId, type, title, description) => {
     if (!logs.has(userId)) {
@@ -39,6 +41,9 @@ const socketHandler = (io) => {
             status: 'online'
         });
 
+        // Send current rooms list for initial discovery
+        socket.emit('rooms_list', roomStore.getRooms());
+
         socket.on('identify', (userData) => {
             const deviceData = {
                 id: userData.id || socket.id,
@@ -49,7 +54,7 @@ const socketHandler = (io) => {
             };
             deviceStore.updateDevice(socket.id, deviceData);
 
-            // Broadcast to others on the same subnet (or just everyone for now, filtered by frontend)
+            // Broadcast to others on the same subnet
             socket.broadcast.emit('device_joined', deviceData);
             console.log(`Device identified: ${userData.nickname} (${ip})`);
         });
@@ -61,56 +66,93 @@ const socketHandler = (io) => {
         });
 
         socket.on('join_room', ({ roomId, user }) => {
-            const room = rooms.get(roomId);
-            if (!room) return;
+            console.log(`[Socket: ${socket.id}] Received 'join_room' Payload -> roomId: ${roomId}, user:`, user);
+            const room = roomStore.getRoom(roomId);
+            if (!room) {
+                console.log(`[Socket] join_room failed: Room ${roomId} not found in store.`);
+                return;
+            }
+
+            // If creator joins, update their socketId in store
+            // Use loose equality (==) to handle potential string/number ID mismatches
+            if (room.creatorId == user.id) {
+                room.creatorSocketId = socket.id;
+                console.log(`[Socket] Creator ${user.nickname} identified. Socket ID Registered: ${socket.id}`);
+            }
 
             socket.join(roomId);
 
             // Add to participants if not already there
-            const isAlreadyIn = room.participants.some(p => p.id === user.id);
-            if (!isAlreadyIn) {
-                const userData = { ...user, socketId: socket.id };
-                room.participants.push(userData);
-                addLog(user.id, 'Network', 'Room Joined', `Joined room: ${room.name}`);
-            }
+            const userData = { ...user, socketId: socket.id };
+            const updatedRoom = roomStore.addParticipant(roomId, userData);
 
-            io.to(roomId).emit('user_joined', {
-                roomId,
-                user: user,
-                participants: room.participants
-            });
+            if (updatedRoom) {
+                addLog(user.id, 'Network', 'Room Joined', `Joined room: ${updatedRoom.name}`);
+
+                // Real-time update for discovery
+                io.emit('room_updated', roomStore.getRooms().find(r => r.id === roomId));
+
+                io.to(roomId).emit('user_joined', {
+                    roomId,
+                    user: user,
+                    participants: updatedRoom.participants
+                });
+            }
 
             console.log(`User ${user.nickname} joined room ${roomId}`);
         });
 
-        socket.on('leave_room', ({ roomId, userId }) => {
-            const room = rooms.get(roomId);
-            if (!room) return;
+        socket.on('leave_room', async ({ roomId, userId }) => {
+            console.log(`[Socket: ${socket.id}] Received 'leave_room' Payload -> roomId: ${roomId}, userId: ${userId}`);
+            const room = roomStore.getRoom(roomId);
+            if (!room) {
+                console.log(`[Socket] leave_room failed: Room ${roomId} not found in store!`);
+                return;
+            }
+
+            console.log(`[Socket] Resolving leave_room payload. room.creatorId: ${room.creatorId} | payload userId: ${userId}`);
+
+            // Check if creator is leaving
+            if (room.creatorId == userId) {
+                console.log(`[Socket] Creator ${userId} left room ${roomId}. Closing room.`);
+
+                // Broadcast closure to all participants
+                io.to(roomId).emit('room_closed', {
+                    message: "Session ended by room creator"
+                });
+
+                // Force all sockets to leave the room
+                const sockets = await io.in(roomId).fetchSockets();
+                for (const s of sockets) {
+                    s.leave(roomId);
+                }
+
+                // Cleanup room from backend
+                cleanupRoom(roomId, io, true);
+                return;
+            }
 
             socket.leave(roomId);
-            room.participants = room.participants.filter(p => p.id !== userId);
+            const updatedRoom = roomStore.removeParticipant(roomId, userId);
 
-            addLog(userId, 'Network', 'Room Left', `Left room: ${room.name}`);
+            if (updatedRoom) {
+                addLog(userId, 'Network', 'Room Left', `Left room: ${updatedRoom.name}`);
 
-            io.to(roomId).emit('user_left', {
-                roomId,
-                userId,
-                participants: room.participants
-            });
+                // Real-time update for discovery
+                io.emit('room_updated', roomStore.getRooms().find(r => r.id === roomId));
+
+                io.to(roomId).emit('user_left', {
+                    roomId,
+                    userId,
+                    participants: updatedRoom.participants
+                });
+            }
 
             console.log(`User ${userId} left room ${roomId}`);
         });
 
         socket.on('send_message', ({ roomId, message }) => {
             io.to(roomId).emit('receive_message', message);
-        });
-
-        socket.on('join_request', ({ roomId, user }) => {
-            io.to(roomId).emit('approval_request', { roomId, user });
-        });
-
-        socket.on('join_approved', ({ roomId, userId, approved }) => {
-            io.to(roomId).emit('approval_response', { roomId, userId, approved });
         });
 
         socket.on('file_uploaded', ({ roomId, file }) => {
@@ -121,7 +163,7 @@ const socketHandler = (io) => {
             io.to(roomId).emit('receive_stroke', { roomId, stroke });
         });
 
-        socket.on('disconnect', () => {
+        socket.on('disconnect', async () => {
             console.log('Client disconnected:', socket.id);
 
             const device = deviceStore.getDevices().find(d => d.id === socket.id || d.socketId === socket.id);
@@ -130,16 +172,38 @@ const socketHandler = (io) => {
             }
             deviceStore.removeDevice(socket.id);
 
-            rooms.forEach((room, roomId) => {
-                const userToRemove = room.participants.find(p => p.socketId === socket.id);
-                if (userToRemove) {
-                    room.participants = room.participants.filter(p => p.socketId !== socket.id);
-                    io.to(roomId).emit('user_left', {
-                        roomId,
-                        userId: userToRemove.id,
-                        participants: room.participants
+            // Clean up participants and pending requests in rooms
+            const rooms = roomStore.getRooms();
+            for (const roomInfo of rooms) {
+                const room = roomStore.getRoom(roomInfo.id);
+                if (!room) continue;
+
+                // If creator disconnects, trigger room closure
+                if (room.creatorSocketId === socket.id) {
+                    console.log(`[Socket] Creator disconnected from room ${room.id}. Closing room.`);
+
+                    io.to(room.id).emit('room_closed', {
+                        message: "Session ended by room creator"
                     });
+
+                    const sockets = await io.in(room.id).fetchSockets();
+                    for (const s of sockets) {
+                        s.leave(room.id);
+                    }
+
+                    cleanupRoom(room.id, io, true);
                 }
+            }
+
+            const affectedRooms = roomStore.removeParticipantBySocket(socket.id);
+            affectedRooms.forEach(room => {
+                // Real-time update for discovery
+                io.emit('room_updated', roomStore.getRooms().find(r => r.id === room.id));
+
+                io.to(room.id).emit('user_left', {
+                    roomId: room.id,
+                    participants: room.participants
+                });
             });
         });
     });

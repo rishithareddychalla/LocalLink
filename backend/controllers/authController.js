@@ -3,13 +3,13 @@ const { v4: uuidv4 } = require('uuid');
 const { users } = require('../store/memoryStore');
 
 const login = (req, res) => {
-    const { nickname, avatarStyle, avatarSeed } = req.body;
+    const { id, nickname, avatarStyle, avatarSeed } = req.body;
 
     if (!nickname) {
         return res.status(400).json({ success: false, error: 'Nickname is required' });
     }
 
-    const userId = uuidv4();
+    const userId = id || uuidv4();
     const sessionToken = jwt.sign(
         { nickname, id: userId },
         process.env.JWT_SECRET || 'locallink_secret_k3y',

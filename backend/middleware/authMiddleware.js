@@ -2,6 +2,8 @@ const jwt = require('jsonwebtoken');
 
 const authMiddleware = (req, res, next) => {
     const authHeader = req.headers.authorization;
+    console.log(`[Auth] Attempting access to ${req.originalUrl}. Auth Header: ${authHeader ? 'found' : 'missing'}`);
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ success: false, error: 'Unauthorized: No token provided' });
     }
@@ -12,6 +14,7 @@ const authMiddleware = (req, res, next) => {
         req.user = decoded;
         next();
     } catch (error) {
+        console.error(`[Auth] JWT verification failed for ${req.originalUrl}:`, error.message);
         return res.status(401).json({ success: false, error: 'Unauthorized: Invalid token' });
     }
 };

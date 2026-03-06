@@ -43,6 +43,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDrawpad } from '../hooks/useDrawpad';
 import { useClickOutside } from '../hooks/useClickOutside';
 
+
 function cn(...inputs) {
     return twMerge(clsx(inputs));
 }
@@ -60,15 +61,14 @@ const RoomInterface = () => {
         sendMessage,
         timeLeft,
         userRoomPreferences,
-        pendingRequests,
-        approveJoinRequest,
-        rejectJoinRequest
+        roomClosureReason,
+        setRoomClosureReason
     } = useRoom();
 
     const { trackDownload, isBlocked } = useFiles();
     const { profile } = useProfile();
     const { addLogEvent } = useNetworkLog();
-    const { notifications, unreadCount, markAsRead, clearNotifications } = useNotifications();
+    const { notifications, unreadCount, markAsRead, clearNotifications, addNotification } = useNotifications();
     const [showNotifications, setShowNotifications] = useState(false);
     const notificationRef = useRef(null);
 
@@ -115,13 +115,30 @@ const RoomInterface = () => {
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    // Auto-terminate redirection
+    // Auto-terminate redirection (Timer)
     useEffect(() => {
         // Only redirect if timeLeft is exactly 0 AND we have metadata (timer initialized)
         if (timeLeft === 0 && activeRoom && roomMetadata) {
             navigate('/rooms');
         }
     }, [timeLeft, activeRoom, navigate, roomMetadata]);
+
+    const [showClosureToast, setShowClosureToast] = useState(false);
+    const [closureMessage, setClosureMessage] = useState('');
+
+    // Room Closure Redirection (e.g., Creator Left)
+    useEffect(() => {
+        if (roomClosureReason) {
+            setClosureMessage(roomClosureReason);
+            setShowClosureToast(true);
+            setRoomClosureReason(null); // Reset it so it doesn't fire again immediately
+
+            // Wait for toast to be visible before redirecting
+            setTimeout(() => {
+                navigate('/dashboard');
+            }, 3000);
+        }
+    }, [roomClosureReason, navigate, setRoomClosureReason]);
 
     const formatTime = (seconds) => {
         const h = Math.floor(seconds / 3600);
@@ -309,7 +326,7 @@ const RoomInterface = () => {
                         className="text-[10px] font-bold px-2 py-0.5 rounded"
                         style={{ color: activeTheme, backgroundColor: `${activeTheme}10` }}
                     >
-                        {participants.filter(p => p.isActive).length} ACTIVE
+                        {participants.length} ACTIVE
                     </span>
                 </div>
                 <div className="flex flex-row items-start gap-4 overflow-x-auto no-scrollbar pb-2">
@@ -318,42 +335,17 @@ const RoomInterface = () => {
                         <div key={i} className="flex flex-col items-center gap-2 group shrink-0">
                             <div className="relative">
                                 <div className="w-10 h-10 rounded-full overflow-hidden bg-surface border border-border">
-                                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${p.avatar || p.name}`} alt={p.name} className="w-full h-full object-cover" />
+                                    <img src={p.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.nickname || p.name}`} alt={p.nickname || p.name} className="w-full h-full object-cover" />
                                 </div>
                                 <div className={cn(
-                                    "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface",
-                                    p.isActive ? "bg-green-500" : "bg-text/10"
+                                    "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface bg-green-500"
                                 )} />
                             </div>
-                            <span className="text-[10px] font-bold text-text-main-muted group-hover:text-text-main transition-colors truncate max-w-[64px] text-center">{p.name}</span>
+                            <span className="text-[10px] font-bold text-text-main-muted group-hover:text-text-main transition-colors truncate max-w-[64px] text-center">{p.nickname || p.name}</span>
                         </div>
                     ))}
 
-                    {/* Pending Requests (Creator Only) */}
-                    {activeRoom?.type === 'owner' && pendingRequests.map((p, i) => (
-                        <div key={`pending-${i}`} className="flex flex-col items-center gap-2 group shrink-0 relative">
-                            <div className="relative">
-                                <div className="w-10 h-10 rounded-full overflow-hidden bg-surface border border-primary/30 opacity-60 grayscale">
-                                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${p.nickname || p.name}`} alt={p.nickname} className="w-full h-full object-cover" />
-                                </div>
-                                <div className="absolute -top-1 -right-1 flex gap-0.5">
-                                    <button
-                                        onClick={() => approveJoinRequest(p.id)}
-                                        className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center text-black border-2 border-surface hover:scale-110 transition-transform"
-                                    >
-                                        <Check size={10} strokeWidth={4} />
-                                    </button>
-                                    <button
-                                        onClick={() => rejectJoinRequest(p.id)}
-                                        className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white border-2 border-surface hover:scale-110 transition-transform"
-                                    >
-                                        <X size={10} strokeWidth={4} />
-                                    </button>
-                                </div>
-                            </div>
-                            <span className="text-[9px] font-black text-primary uppercase tracking-tighter">Pending</span>
-                        </div>
-                    ))}
+
 
                     <button className="w-10 h-10 rounded-full bg-text/[0.03] hover:bg-text/[0.08] text-text-main flex items-center justify-center shrink-0 border border-border transition-all">
                         <UsersIcon size={14} style={{ color: activeTheme }} />
@@ -375,8 +367,9 @@ const RoomInterface = () => {
                         <Wifi style={{ color: activeTheme }} size={20} />
                     </div>
                     <div className="flex-1">
-                        <h1 className="text-lg md:text-xl font-black text-text-main tracking-tight uppercase truncate">
+                        <h1 className="text-lg md:text-xl font-black text-text-main tracking-tight uppercase truncate flex items-baseline gap-2">
                             {roomMetadata?.roomName || 'Active Room'}
+                            <span className="text-[10px] md:text-xs font-mono text-text-main-muted/40 tracking-normal normal-case font-medium">#{roomMetadata?.roomId}</span>
                         </h1>
                         <div className="flex items-center gap-2">
                             <span className="text-[9px] font-black tracking-widest" style={{ color: activeTheme }}>ENCRYPTED TUNNEL</span>
@@ -636,6 +629,27 @@ const RoomInterface = () => {
                 onClose={() => setShowAllFilesModal(false)}
                 activeTheme={activeTheme}
             />
+
+            {/* Room Closure Toast */}
+            <AnimatePresence>
+                {showClosureToast && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 50, scale: 0.9 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 bg-surface border-2 border-primary shadow-2xl rounded-2xl p-4 flex items-center gap-3 backdrop-blur-xl"
+                    >
+                        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                            <AlertTriangle size={20} className="text-primary" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-black text-text-main uppercase tracking-widest">Room Closed</h3>
+                            <p className="text-xs text-text-main-muted font-medium">{closureMessage}</p>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
         </div>
     );
 };

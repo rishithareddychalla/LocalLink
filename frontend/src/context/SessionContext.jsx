@@ -12,6 +12,11 @@ export const SessionProvider = ({ children }) => {
 
     // Restore session from localStorage on mount
     useEffect(() => {
+        // Cleanup old token key if present
+        if (localStorage.getItem('llr_token')) {
+            localStorage.removeItem('llr_token');
+        }
+
         const storedToken = getToken();
         if (storedToken) {
             const nickname = getNicknameFromToken(storedToken);
@@ -32,6 +37,7 @@ export const SessionProvider = ({ children }) => {
             const response = await apiRequest('/auth/login', {
                 method: 'POST',
                 body: JSON.stringify({
+                    id: profileData.id,
                     nickname: profileData.nickname,
                     avatarStyle: profileData.avatarStyle,
                     avatarSeed: profileData.avatarSeed
@@ -59,6 +65,16 @@ export const SessionProvider = ({ children }) => {
         setTokenState(null);
         setIsAuthenticated(false);
     }, []);
+
+    // Listen for global unauthorized events (e.g., expired JWT)
+    useEffect(() => {
+        const handleUnauthorized = () => {
+            console.warn('[Session] Unauthorized signal received. Logging out.');
+            logout();
+        };
+        window.addEventListener('llr_unauthorized', handleUnauthorized);
+        return () => window.removeEventListener('llr_unauthorized', handleUnauthorized);
+    }, [logout]);
 
     const value = {
         user,

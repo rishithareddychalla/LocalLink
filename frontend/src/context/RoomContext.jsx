@@ -3,31 +3,19 @@ import { io } from 'socket.io-client';
 import { createRoomAPI, joinRoomAPI, leaveRoomAPI } from '../services/roomService';
 import { useProfile } from './ProfileContext';
 import { useNetworkLog } from './NetworkLogContext';
-import { hashPassword } from '../utils/hashPassword';
-import { NEARBY_ROOMS } from '../data/mockData';
 import {
     getPreferences,
     savePreferences,
     saveRoomMetadata,
-    getRoomMetadata,
     clearRoomMetadata,
-    getRoomFiles,
-    saveRoomFiles,
-    getDrawpadStrokes,
-    saveDrawpadStrokes,
     getRoomRegistry,
-    saveRoomRegistry,
-    saveRoomParticipants,
-    getRoomParticipants,
-    savePendingRequests,
-    getPendingRequests
+    saveRoomRegistry
 } from '../utils/persistRoomState';
 import { generateUniqueRoomId } from '../utils/generateRoomId';
 import { useFiles } from './FileContext';
 
+
 const RoomContext = createContext();
-
-
 
 export const RoomProvider = ({ children }) => {
     const [activeRoom, setActiveRoom] = useState(null);
@@ -36,10 +24,14 @@ export const RoomProvider = ({ children }) => {
     const [participants, setParticipants] = useState([]);
     const [roomMetadata, setRoomMetadataState] = useState(null);
     const [timeLeft, setTimeLeft] = useState(null);
-    const [pendingRequests, setPendingRequests] = useState([]);
     const [drawpadStrokes, setDrawpadStrokes] = useState([]);
     const [roomRegistry, setRoomRegistry] = useState(getRoomRegistry());
     const [generatedId, setGeneratedId] = useState('');
+    const [roomClosureReason, setRoomClosureReason] = useState(null);
+
+    useEffect(() => {
+        setGeneratedId(generateUniqueRoomId(roomRegistry));
+    }, [roomRegistry]);
 
     const { addRoomFile, revokeRoomFiles, roomFilesMap } = useFiles();
 
@@ -50,7 +42,6 @@ export const RoomProvider = ({ children }) => {
     const { addLogEvent } = useNetworkLog();
 
     const [chatMessages, setChatMessages] = useState([]);
-    const [joinRequestStatus, setJoinRequestStatus] = useState('idle'); // 'idle', 'pending', 'approved', 'rejected'
 
     const sendMessage = useCallback((text) => {
         if (!activeRoom || !text.trim()) return;
@@ -71,16 +62,25 @@ export const RoomProvider = ({ children }) => {
         }
     }, [activeRoom, profile]);
 
-    const leaveRoom = useCallback(async () => {
+    const leaveRoom = useCallback(async (reason) => {
         if (!activeRoom) return;
 
         try {
             if (socketRef.current) {
-                socketRef.current.emit('leave_room', {
-                    roomId: activeRoom.id,
-                    userId: profile.id
-                });
-                socketRef.current.disconnect();
+                // If closing due to server/creator, don't emit leave_room again
+                if (reason !== 'server_closed') {
+                    socketRef.current.emit('leave_room', {
+                        roomId: activeRoom.id,
+                        userId: profile.id
+                    });
+                }
+
+                // Allow time for the emit to reach the server before disconnecting
+                setTimeout(() => {
+                    if (socketRef.current) {
+                        socketRef.current.disconnect();
+                    }
+                }, 500);
             }
 
             revokeRoomFiles(activeRoom.id);
@@ -89,29 +89,33 @@ export const RoomProvider = ({ children }) => {
             setChatMessages([]);
             setDrawpadStrokes([]);
             setRoomMetadataState(null);
-            setJoinRequestStatus('idle');
             clearRoomMetadata();
             setTimeLeft(0);
 
             if (timerRef.current) clearInterval(timerRef.current);
-            setGeneratedId(generateUniqueRoomId(roomRegistry));
-
+            await leaveRoomAPI(activeRoom.id);
             addLogEvent("Activity", "Room Left", `Left ${activeRoom.name}`);
         } catch (error) {
-            console.error('Failed to leave room:', error);
+            console.error('Leave room error:', error);
         }
-    }, [activeRoom, profile.id, roomRegistry, addLogEvent, revokeRoomFiles]);
+    }, [activeRoom, profile, revokeRoomFiles, addLogEvent]);
 
-    // Socket Initialization
     useEffect(() => {
-        socketRef.current = io(`http://${window.location.hostname}:5000`, {
-            autoConnect: false,
-            reconnectionAttempts: 5
-        });
-        socketRef.current.on('connect', () => {
-            console.log('Connected to signaling server');
-            if (profile.id) {
-                socketRef.current.emit('identify', {
+        if (!socketRef.current) {
+            socketRef.current = io(window.location.origin.replace('5173', '5000'), {
+                autoConnect: false,
+                transports: ['websocket', 'polling']
+            });
+        }
+
+        const socket = socketRef.current;
+
+        socket.on('connect', () => {
+            console.log('[RoomContext] Socket connected:', socket.id);
+            addLogEvent("Network", "Connected", "Real-time bridge established");
+
+            if (profile?.id) {
+                socket.emit('identify', {
                     id: profile.id,
                     nickname: profile.nickname,
                     avatar: profile.avatar,
@@ -120,67 +124,58 @@ export const RoomProvider = ({ children }) => {
             }
         });
 
-        socketRef.current.on('device_joined', (device) => {
-            console.log('New device discovered:', device.nickname);
-            // Optionally add a notification here
+        socket.on('disconnect', () => {
+            console.log('[RoomContext] Socket disconnected');
+            addLogEvent("Network", "Disconnected", "Real-time bridge lost");
         });
 
-        socketRef.current.on('device_left', (deviceId) => {
-            console.log('Device left:', deviceId);
-        });
-
-        socketRef.current.on('user_joined', ({ participants }) => {
+        socket.on('user_joined', ({ participants }) => {
             setParticipants(participants);
         });
 
-        socketRef.current.on('user_left', ({ participants }) => {
+        socket.on('user_left', ({ participants }) => {
             setParticipants(participants);
         });
 
-        socketRef.current.on('receive_message', (message) => {
+        socket.on('receive_message', (message) => {
             setChatMessages(prev => [...prev, message]);
         });
 
-        socketRef.current.on('approval_request', ({ user }) => {
-            setPendingRequests(prev => {
-                if (prev.some(p => p.id === user.id)) return prev;
-                return [...prev, user];
-            });
-        });
-
-        socketRef.current.on('approval_response', ({ roomId, userId, approved }) => {
-            if (profile.id === userId) {
-                if (approved) {
-                    setJoinRequestStatus('approved');
-                    addLogEvent("Network", "Access Granted", "Your request to join has been approved.");
-                } else {
-                    setJoinRequestStatus('rejected');
-                    addLogEvent("Network", "Access Denied", "Your request to join was rejected.");
-                }
-            }
-        });
-
-        socketRef.current.on('room_expired', () => {
-            leaveRoom();
+        socket.on('room_expired', () => {
+            setRoomClosureReason("Room session expired");
+            leaveRoom('server_closed');
             addLogEvent("Network", "Room Expired", "The current room session has reached its expiry limit.");
         });
 
-        socketRef.current.on('receive_stroke', ({ stroke }) => {
+        socket.on('room_closed', ({ message }) => {
+            setRoomClosureReason(message);
+            leaveRoom('server_closed');
+            addLogEvent("Network", "Room Closed", message);
+        });
+
+        socket.on('receive_stroke', ({ stroke }) => {
             setDrawpadStrokes(prev => [...prev, stroke]);
         });
 
-        socketRef.current.on('new_file', ({ file }) => {
+        socket.on('new_file', ({ file }) => {
             if (activeRoom) {
                 addRoomFile(activeRoom.id, file);
             }
         });
 
         return () => {
-            if (socketRef.current) socketRef.current.disconnect();
+            socket.off('connect');
+            socket.off('disconnect');
+            socket.off('user_joined');
+            socket.off('user_left');
+            socket.off('receive_message');
+            socket.off('room_expired');
+            socket.off('room_closed');
+            socket.off('send_stroke');
+            socket.off('new_file');
         };
-    }, [addRoomFile, addLogEvent, activeRoom, profile.id, leaveRoom]);
+    }, [profile, leaveRoom, addLogEvent, activeRoom, addRoomFile]);
 
-    // Timer Logic
     useEffect(() => {
         if (activeRoom && roomMetadata?.expiresAt) {
             const expiry = new Date(roomMetadata.expiresAt).getTime();
@@ -197,7 +192,6 @@ export const RoomProvider = ({ children }) => {
                         saveRoomRegistry(updated);
                         return updated;
                     });
-                    setPendingRequests([]);
                     leaveRoom();
                 }
             };
@@ -214,30 +208,28 @@ export const RoomProvider = ({ children }) => {
 
     const createRoom = async (roomData) => {
         if (activeRoom) await leaveRoom();
+        setRoomClosureReason(null);
+        const roomId = roomData.id || generatedId;
 
         try {
-            const roomId = generatedId || generateUniqueRoomId(roomRegistry);
             const response = await createRoomAPI({
-                ...roomData,
                 id: roomId,
-                creatorId: profile.id
+                name: roomData.name,
+                isPrivate: roomData.isPrivate,
+                password: roomData.password,
+                expiry: roomData.expiry,
+                creatorSocketId: socketRef.current?.id
             });
 
             if (response.success) {
                 const newRoom = response.data;
-                const expiresAt = newRoom.expiresAt;
-
-                const metadata = {
+                setActiveRoom(newRoom);
+                setRoomMetadataState({
                     roomId: newRoom.id,
                     roomName: newRoom.name,
-                    createdAt: newRoom.createdAt,
-                    expiresAt,
-                    duration: roomData.expiry,
-                };
-
-                setActiveRoom(newRoom);
-                setRoomMetadataState(metadata);
-                saveRoomMetadata(metadata);
+                    expiresAt: newRoom.expiresAt
+                });
+                setParticipants(newRoom.participants || []);
 
                 if (socketRef.current) {
                     socketRef.current.connect();
@@ -254,6 +246,7 @@ export const RoomProvider = ({ children }) => {
                 }
 
                 addLogEvent("Activity", "Room Created", `Created ${newRoom.name} (${roomId})`);
+                setGeneratedId(generateUniqueRoomId(roomRegistry));
             }
             return response;
         } catch (error) {
@@ -264,18 +257,19 @@ export const RoomProvider = ({ children }) => {
 
     const joinRoom = async (roomCode, userData = {}) => {
         if (activeRoom) await leaveRoom();
+        setRoomClosureReason(null);
 
         try {
             const response = await joinRoomAPI(roomCode, userData);
             if (response.success && response.status === 'joined') {
                 const joinedRoom = response.data;
-
                 setActiveRoom(joinedRoom);
                 setRoomMetadataState({
                     roomId: joinedRoom.id,
                     roomName: joinedRoom.name,
                     expiresAt: joinedRoom.expiresAt
                 });
+                setParticipants(joinedRoom.participants || []);
 
                 if (socketRef.current) {
                     socketRef.current.connect();
@@ -292,23 +286,10 @@ export const RoomProvider = ({ children }) => {
                 }
 
                 addLogEvent("Activity", "Room Joined", `Joined ${joinedRoom.name} (${roomCode})`);
-                setJoinRequestStatus('idle');
-            } else if (response.status === 'pending') {
-                setJoinRequestStatus('pending');
-                if (socketRef.current) {
-                    socketRef.current.connect();
-                    socketRef.current.emit('join_room', {
-                        roomId: roomCode,
-                        user: profile,
-                        status: 'pending'
-                    });
-                }
-                addLogEvent("Activity", "Request Sent", `Join request sent for room ${roomCode}`);
             }
             return response;
         } catch (error) {
             console.error('Join room error:', error);
-            setJoinRequestStatus('idle');
             return { success: false, error };
         }
     };
@@ -319,35 +300,9 @@ export const RoomProvider = ({ children }) => {
         savePreferences(updated);
     };
 
-    const approveJoinRequest = useCallback((userId) => {
-        if (socketRef.current && activeRoom) {
-            socketRef.current.emit('join_approved', {
-                roomId: activeRoom.id,
-                userId,
-                approved: true
-            });
-            setPendingRequests(prev => prev.filter(r => r.id !== userId));
-            addLogEvent("Activity", "Request Approved", `Approved user ${userId}`);
-        }
-    }, [activeRoom]);
-
-    const rejectJoinRequest = useCallback((userId) => {
-        if (socketRef.current && activeRoom) {
-            socketRef.current.emit('join_approved', {
-                roomId: activeRoom.id,
-                userId,
-                approved: false
-            });
-            setPendingRequests(prev => prev.filter(r => r.id !== userId));
-            addLogEvent("Activity", "Request Rejected", `Rejected user ${userId}`);
-        }
-    }, [activeRoom]);
-
     const addStroke = useCallback((stroke) => {
         if (!activeRoom) return;
-
         setDrawpadStrokes(prev => [...prev, stroke]);
-
         if (socketRef.current) {
             socketRef.current.emit('send_stroke', {
                 roomId: activeRoom.id,
@@ -368,29 +323,24 @@ export const RoomProvider = ({ children }) => {
             participants,
             roomMetadata,
             chatMessages,
-            joinRequestStatus,
             roomFiles: activeRoom ? (roomFilesMap[activeRoom.id] || []) : [],
             drawpadStrokes,
             timeLeft,
             generatedId,
             roomRegistry,
-            NEARBY_ROOMS,
+            roomClosureReason,
+            setRoomClosureReason,
             createRoom,
             joinRoom,
             leaveRoom,
             sendMessage,
             updatePreferences,
-            approveJoinRequest,
-            rejectJoinRequest,
-            pendingRequests,
             refreshGeneratedId,
-            setJoinRequestStatus,
             addStroke
         }}>
             {children}
         </RoomContext.Provider>
     );
-
 };
 
 export const useRoom = () => {

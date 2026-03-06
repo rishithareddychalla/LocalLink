@@ -9,6 +9,7 @@ import ActiveRoomsPanel from '../components/dashboard/ActiveRoomsPanel';
 import ActiveSessionBanner from '../components/dashboard/ActiveSessionBanner';
 import InviteQRModal from '../components/InviteQRModal';
 
+
 const Dashboard = () => {
     const { profile } = useProfile();
     const { activeRoom } = useRoom();
@@ -84,6 +85,7 @@ const Dashboard = () => {
                 onClose={() => setIsInviteOpen(false)}
                 lanIp={lanIp}
             />
+
         </div>
     );
 };

@@ -20,10 +20,7 @@ const JoinRoom = () => {
         joinRoom,
         userRoomPreferences,
         roomRegistry,
-        NEARBY_ROOMS,
-        updatePreferences,
-        joinRequestStatus,
-        setJoinRequestStatus
+        updatePreferences
     } = useRoom();
     const { profile, updateNickname } = useProfile();
     const { addLogEvent } = useNetworkLog();
@@ -40,33 +37,22 @@ const JoinRoom = () => {
     // Find room details (Requirement 2 & 6)
     const roomName = roomData?.name || (roomId?.startsWith('LL-') ? `Collaborative Session ${roomId.split('-')[1]}` : roomId) || 'Private Room';
     const participantsList = roomData?.participants || [];
-    const isPrivate = roomData?.type === 'private' || roomData?.visibility === 'private' || !!roomData?.passwordHash;
-    const approvalRequired = roomData?.approvalRequired;
 
-    // Auto-navigate on approval
-    useEffect(() => {
-        if (joinRequestStatus === 'approved') {
-            addLogEvent(`Joined '${roomName}'`, `Networking enabled • ID: ${roomId}`);
-            setJoinRequestStatus('idle'); // Clear status for next time
-            navigate(`/room/${roomId}`);
-        } else if (joinRequestStatus === 'rejected') {
-            setError('Your join request was rejected by the room owner.');
-            setJoinRequestStatus('idle');
-        }
-    }, [joinRequestStatus, roomId, roomName, navigate, addLogEvent, setJoinRequestStatus]);
+    // Explicit check for privacy
+    const isPrivate = roomData?.isPrivate === true;
+    const isDataLoaded = !!roomData;
+    const errorPrefix = error === 'Incorrect room password' ? '❌ ' : '';
+
+
+
 
     // Fetch room details if not in nearby/registry
     useEffect(() => {
         const fetchRoomDetails = async () => {
-            const nearby = NEARBY_ROOMS.find(r => r.id === roomId);
             const registry = roomRegistry[roomId];
 
-            if (nearby) {
-                setRoomData(nearby);
-                return;
-            }
             if (registry) {
-                setRoomData({ ...registry, name: registry.roomName });
+                setRoomData({ ...registry, name: registry.roomName, isPrivate: registry.isPrivate });
                 return;
             }
 
@@ -74,19 +60,22 @@ const JoinRoom = () => {
             const response = await getRoomAPI(roomId);
             if (response.success) {
                 setRoomData(response.data);
+                setError(null);
+            } else {
+                setError(response.error || 'Room not found');
             }
             setLoadingRoom(false);
         };
 
         fetchRoomDetails();
-    }, [roomId, NEARBY_ROOMS, roomRegistry]);
+    }, [roomId, roomRegistry]);
 
     const handleJoin = async (e) => {
-        e.preventDefault();
+        if (e) e.preventDefault();
         setError(null);
         if (nickname.trim()) {
             const userData = {
-                id: profile.id, // Use real profile ID
+                id: profile.id,
                 nickname,
                 password,
                 accentColor: themeColor,
@@ -104,12 +93,22 @@ const JoinRoom = () => {
                     addLogEvent(`Joined '${roomName}'`, `Networking enabled • ID: ${roomId}`);
                     navigate(`/room/${roomId}`);
                 }
-                // 'pending' is handled by joinRequestStatus effect
             } else {
                 setError(response.error || 'Failed to join room');
             }
         }
     };
+
+    // Auto-join for Public Rooms (Requirement: Join immediately)
+    useEffect(() => {
+        if (roomData && !roomData.isPrivate && nickname.trim() && !loadingRoom && !error) {
+            // Delay slightly for UX so they see they are joining
+            const timer = setTimeout(() => {
+                handleJoin();
+            }, 800);
+            return () => clearTimeout(timer);
+        }
+    }, [roomData, loadingRoom]);
 
     return (
         <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
@@ -231,35 +230,7 @@ const JoinRoom = () => {
                         </div>
                     </div>
 
-                    {/* Pending Approval Overlay (Requirement 3 & 4) */}
-                    <AnimatePresence>
-                        {joinRequestStatus === 'pending' && (
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                className="absolute inset-0 z-50 bg-surface/95 backdrop-blur-md flex flex-col items-center justify-center p-10 text-center space-y-6"
-                            >
-                                <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center animate-pulse">
-                                    <Lock size={40} className="text-primary" />
-                                </div>
-                                <div>
-                                    <h2 className="text-2xl font-bold text-text-main mb-2">Awaiting Approval</h2>
-                                    <p className="text-text-main-muted text-sm">The room creator has been notified. You'll enter automatically once approved.</p>
-                                </div>
-                                <div className="flex gap-4">
-                                    <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0s' }} />
-                                    <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0.2s' }} />
-                                    <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0.4s' }} />
-                                </div>
-                                <button
-                                    onClick={() => setJoinRequestStatus('idle')}
-                                    className="text-[10px] font-black text-text-main-muted/20 uppercase tracking-[0.3em] hover:text-text-main-muted transition-colors"
-                                >
-                                    Cancel Request
-                                </button>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+
                 </div>
 
                 {/* Footer Participants */}

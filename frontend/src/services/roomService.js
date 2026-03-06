@@ -41,6 +41,15 @@ export const leaveRoomAPI = async (roomId) => {
     return { success: true };
 };
 
+export const getRoomsAPI = async () => {
+    try {
+        const response = await apiRequest('/rooms');
+        return response;
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+};
+
 export const getMockParticipants = () => {
     return [
         { id: 'p1', name: 'Alex Oniel', avatar: 'Alex', theme: '#2563EB', isActive: true, joinedAt: new Date().toISOString() },
