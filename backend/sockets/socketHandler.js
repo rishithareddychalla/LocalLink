@@ -1,7 +1,9 @@
 const { logs } = require('../store/memoryStore');
 const deviceStore = require('../store/deviceStore');
 const roomStore = require('../store/roomStore');
+const messageStore = require('../store/messageStore');
 const { cleanupRoom } = require('../controllers/roomController');
+const crypto = require('crypto');
 
 const addLog = (userId, type, title, description) => {
     if (!logs.has(userId)) {
@@ -89,8 +91,23 @@ const socketHandler = (io) => {
             if (updatedRoom) {
                 addLog(user.id, 'Network', 'Room Joined', `Joined room: ${updatedRoom.name}`);
 
+                // Send message history to the joined user
+                socket.emit('room_messages', messageStore.getMessages(roomId));
+
+                // Create and store system message
+                const systemMsg = {
+                    id: crypto.randomUUID(),
+                    roomId,
+                    type: 'system',
+                    message: `${user.nickname} joined the room`,
+                    timestamp: Date.now()
+                };
+                messageStore.addMessage(roomId, systemMsg);
+
                 // Real-time update for discovery
                 io.emit('room_updated', roomStore.getRooms().find(r => r.id === roomId));
+
+                io.to(roomId).emit('receive_message', systemMsg);
 
                 io.to(roomId).emit('user_joined', {
                     roomId,
@@ -138,8 +155,20 @@ const socketHandler = (io) => {
             if (updatedRoom) {
                 addLog(userId, 'Network', 'Room Left', `Left room: ${updatedRoom.name}`);
 
+                // Create and store system join/leave message
+                const systemMsg = {
+                    id: crypto.randomUUID(),
+                    roomId,
+                    type: 'system',
+                    message: `${room.participants.find(p => p.id === userId)?.nickname || 'Someone'} left the room`,
+                    timestamp: Date.now()
+                };
+                messageStore.addMessage(roomId, systemMsg);
+
                 // Real-time update for discovery
                 io.emit('room_updated', roomStore.getRooms().find(r => r.id === roomId));
+
+                io.to(roomId).emit('receive_message', systemMsg);
 
                 io.to(roomId).emit('user_left', {
                     roomId,
@@ -151,8 +180,18 @@ const socketHandler = (io) => {
             console.log(`User ${userId} left room ${roomId}`);
         });
 
-        socket.on('send_message', ({ roomId, message }) => {
-            io.to(roomId).emit('receive_message', message);
+        socket.on('send_message', ({ roomId, userId, nickname, avatar, message }) => {
+            const newMessage = {
+                id: crypto.randomUUID(),
+                roomId,
+                userId,
+                nickname,
+                avatar,
+                message,
+                timestamp: Date.now()
+            };
+            messageStore.addMessage(roomId, newMessage);
+            io.to(roomId).emit('receive_message', newMessage);
         });
 
         socket.on('file_uploaded', ({ roomId, file }) => {
@@ -161,6 +200,10 @@ const socketHandler = (io) => {
 
         socket.on('send_stroke', ({ roomId, stroke }) => {
             io.to(roomId).emit('receive_stroke', { roomId, stroke });
+        });
+
+        socket.on('typing', ({ roomId, userId, nickname, isTyping }) => {
+            socket.to(roomId).emit('typing_update', { userId, nickname, isTyping });
         });
 
         socket.on('disconnect', async () => {

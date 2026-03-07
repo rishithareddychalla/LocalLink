@@ -6,6 +6,7 @@ import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useRoom } from '../context/RoomContext';
 import { useProfile } from '../context/ProfileContext';
+import { useSettings } from '../context/SettingsContext';
 import { useNetworkLog } from '../context/NetworkLogContext';
 import { getRoomAPI } from '../services/roomService';
 
@@ -23,10 +24,11 @@ const JoinRoom = () => {
         updatePreferences
     } = useRoom();
     const { profile, updateNickname } = useProfile();
+    const { settings } = useSettings();
     const { addLogEvent } = useNetworkLog();
 
     const [nickname, setNickname] = useState(profile.nickname || 'Guest');
-    const [themeColor, setThemeColor] = useState(userRoomPreferences?.selectedTheme || '#2563EB');
+    const [themeColor, setThemeColor] = useState('#00f0ff');
     const [loadingRoom, setLoadingRoom] = useState(false);
     const [roomData, setRoomData] = useState(null);
     const [password, setPassword] = useState('');
@@ -52,7 +54,9 @@ const JoinRoom = () => {
             const registry = roomRegistry[roomId];
 
             if (registry) {
-                setRoomData({ ...registry, name: registry.roomName, isPrivate: registry.isPrivate });
+                const roomObj = { ...registry, name: registry.roomName, isPrivate: registry.isPrivate };
+                setRoomData(roomObj);
+                if (roomObj.accentColor) setThemeColor(roomObj.accentColor);
                 return;
             }
 
@@ -60,6 +64,7 @@ const JoinRoom = () => {
             const response = await getRoomAPI(roomId);
             if (response.success) {
                 setRoomData(response.data);
+                if (response.data.accentColor) setThemeColor(response.data.accentColor);
                 setError(null);
             } else {
                 setError(response.error || 'Room not found');
@@ -83,8 +88,8 @@ const JoinRoom = () => {
                 avatarSeed: profile.avatarSeed
             };
 
-            // Persist preferences
-            updatePreferences({ nickname, selectedTheme: themeColor });
+            // Persist nickname
+            updatePreferences({ nickname });
             updateNickname(nickname);
 
             const response = await joinRoom(roomId, userData);
@@ -128,9 +133,9 @@ const JoinRoom = () => {
                 <div className="p-10 pb-8 text-center border-b border-border">
                     <h1 className="text-3xl font-bold text-text-main mb-4">Ready to collaborate?</h1>
                     <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border"
-                        style={{ backgroundColor: `${themeColor}10`, borderColor: `${themeColor}20` }}>
+                        style={{ backgroundColor: `${settings.accentColor}10`, borderColor: `${settings.accentColor}20` }}>
                         <span className="w-2 h-2 rounded-full animate-pulse"
-                            style={{ backgroundColor: themeColor }} />
+                            style={{ backgroundColor: settings.accentColor }} />
                         <span className="text-sm font-bold"
                             style={{ color: themeColor }}>
                             {isPrivate ? <Lock size={12} className="inline mr-1 mb-0.5" /> : null}
@@ -155,9 +160,9 @@ const JoinRoom = () => {
                                 onChange={(e) => setNickname(e.target.value)}
                                 placeholder="e.g. Alex_Dev"
                                 className="w-full bg-background border border-border rounded-2xl py-4 pl-12 pr-4 text-text-main placeholder:text-text-main-muted/20 focus:outline-none transition-all"
-                                style={{ borderColor: nickname.trim() ? `${themeColor}30` : 'var(--border)' }}
-                                onFocus={(e) => e.target.style.borderColor = themeColor}
-                                onBlur={(e) => e.target.style.borderColor = nickname.trim() ? `${themeColor}30` : 'var(--border)'}
+                                style={{ borderColor: nickname.trim() ? `${settings.accentColor}30` : 'var(--border)' }}
+                                onFocus={(e) => e.target.style.borderColor = settings.accentColor}
+                                onBlur={(e) => e.target.style.borderColor = nickname.trim() ? `${settings.accentColor}30` : 'var(--border)'}
                             />
                         </div>
                     </div>
@@ -217,7 +222,7 @@ const JoinRoom = () => {
                                 onClick={handleJoin}
                                 disabled={!nickname.trim()}
                                 className="w-full text-black py-4 rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-                                style={{ backgroundColor: themeColor, boxShadow: `0 0 30px ${themeColor}30` }}
+                                style={{ backgroundColor: settings.accentColor, boxShadow: `0 0 30px ${settings.accentColor}30` }}
                                 onMouseEnter={(e) => !e.target.disabled && (e.target.style.filter = 'brightness(1.1)')}
                                 onMouseLeave={(e) => e.target.style.filter = 'none'}
                             >

@@ -19,7 +19,8 @@ class RoomStore {
             password: roomData.password || null,
             participants: [],
             createdAt: new Date(),
-            expiresAt: new Date(Date.now() + (roomData.expiryTime || 30) * 60000)
+            expiresAt: new Date(Date.now() + (roomData.expiryTime || 30) * 60000),
+            accentColor: roomData.accentColor || '#22d3ee'
         };
         this.rooms.set(room.id, room);
         return room;
@@ -45,7 +46,8 @@ class RoomStore {
                     avatar: p.avatar
                 })),
                 createdAt: room.createdAt,
-                expiresAt: room.expiresAt
+                expiresAt: room.expiresAt,
+                accentColor: room.accentColor
             };
         });
     }

@@ -60,13 +60,11 @@ const Rooms = () => {
     const [searchTermNearby, setSearchTermNearby] = useState('');
     const [copied, setCopied] = useState(false);
 
-    // Sync local theme color with global accent color if no local preference is set
+    // Default to a safe color if settings hasn't loaded
     useEffect(() => {
-        if (!userRoomPreferences.selectedTheme) {
-            setCreateThemeColor(settings.accentColor);
-            setJoinThemeColor(settings.accentColor);
-        }
-    }, [settings.accentColor, userRoomPreferences.selectedTheme]);
+        setCreateThemeColor(settings.accentColor || '#00f0ff');
+        setJoinThemeColor(settings.accentColor || '#00f0ff');
+    }, [settings.accentColor]);
 
     const colors = ['#00f0ff', '#A020F0', '#ff00ff', '#00ff00', '#ffff00'];
 
@@ -74,8 +72,8 @@ const Rooms = () => {
         e.preventDefault();
         if (!roomName.trim()) return;
 
-        // Persist preferences (Requirement 7)
-        updatePreferences({ nickname, selectedTheme: createThemeColor });
+        // Store personal preference in RoomContext (but NOT global settings)
+        updatePreferences({ nickname });
 
         const roomData = {
             id: generatedId,
@@ -83,6 +81,7 @@ const Rooms = () => {
             isPrivate,
             password: isPrivate ? password : '',
             expiry,
+            accentColor: createThemeColor,
             type: 'owner'
         };
 
@@ -101,8 +100,7 @@ const Rooms = () => {
     const handleJoinRoom = (e) => {
         e.preventDefault();
         if (roomCode.trim()) {
-            // Persist preferences before moving to JoinRoom page
-            updatePreferences({ nickname, selectedTheme: joinThemeColor });
+            updatePreferences({ nickname });
             navigate(`/join/${roomCode.trim().toUpperCase()}`);
         }
     };
@@ -130,8 +128,8 @@ const Rooms = () => {
                 avatarSeed: profile.avatarSeed
             };
 
-            // Persist preferences
-            updatePreferences({ nickname, selectedTheme: joinThemeColor });
+            // Persist nickname
+            updatePreferences({ nickname });
 
             const response = await joinRoom(room.id, userData);
             if (response.success) {
@@ -194,7 +192,7 @@ const Rooms = () => {
                                                 ? "text-background border-transparent shadow-lg"
                                                 : "bg-surface text-text-main-muted border-border hover:border-text-muted/20"
                                         )}
-                                        style={!isPrivate ? { backgroundColor: createThemeColor, boxShadow: `0 0 20px ${createThemeColor}2a` } : {}}
+                                        style={!isPrivate ? { backgroundColor: settings.accentColor, boxShadow: `0 0 20px ${settings.accentColor}2a` } : {}}
                                     >
                                         Public
                                     </button>
@@ -207,7 +205,7 @@ const Rooms = () => {
                                                 ? "text-background border-transparent shadow-lg"
                                                 : "bg-surface text-text-main-muted border-border hover:border-text-muted/20"
                                         )}
-                                        style={isPrivate ? { backgroundColor: createThemeColor, boxShadow: `0 0 20px ${createThemeColor}2a` } : {}}
+                                        style={isPrivate ? { backgroundColor: settings.accentColor, boxShadow: `0 0 20px ${settings.accentColor}2a` } : {}}
                                     >
                                         Private
                                     </button>
@@ -230,9 +228,9 @@ const Rooms = () => {
                                             placeholder="••••••••"
                                             required={isPrivate}
                                             className="w-full bg-background border border-border rounded-2xl py-3.5 md:py-4 px-5 md:px-6 text-text-main placeholder:text-text-main-muted focus:outline-none transition-all font-medium text-sm md:text-base"
-                                            style={{ borderColor: isPrivate ? `${createThemeColor}14` : 'var(--border-color)' }}
-                                            onFocus={(e) => e.target.style.borderColor = createThemeColor}
-                                            onBlur={(e) => e.target.style.borderColor = `${createThemeColor}14`}
+                                            style={{ borderColor: isPrivate ? `${settings.accentColor}14` : 'var(--border-color)' }}
+                                            onFocus={(e) => e.target.style.borderColor = settings.accentColor}
+                                            onBlur={(e) => e.target.style.borderColor = `${settings.accentColor}14`}
                                         />
                                     </motion.div>
                                 )}
@@ -252,7 +250,7 @@ const Rooms = () => {
                                                     ? "text-background border-transparent shadow-lg"
                                                     : "bg-surface text-text-main-muted border-border hover:border-text-muted/20"
                                             )}
-                                            style={expiry === time ? { backgroundColor: createThemeColor, boxShadow: `0 0 20px ${createThemeColor}2a` } : {}}
+                                            style={expiry === time ? { backgroundColor: settings.accentColor, boxShadow: `0 0 20px ${settings.accentColor}2a` } : {}}
                                         >
                                             {time}
                                         </button>
@@ -283,9 +281,9 @@ const Rooms = () => {
                             </div>
 
                             <div className="space-y-2 relative">
-                                <label className="text-[10px] font-bold uppercase tracking-widest pl-1" style={{ color: `${createThemeColor}99` }}>Auto-generated ID</label>
+                                <label className="text-[10px] font-bold uppercase tracking-widest pl-1" style={{ color: `${settings.accentColor}99` }}>Auto-generated ID</label>
                                 <div className="w-full bg-background border rounded-2xl py-3.5 md:py-4 px-5 md:px-6 font-bold tracking-[0.2em] flex items-center justify-between text-xs md:text-sm transition-colors"
-                                    style={{ color: createThemeColor, borderColor: `${createThemeColor}20` }}>
+                                    style={{ color: settings.accentColor, borderColor: `${settings.accentColor}20` }}>
                                     <span>{generatedId}</span>
                                     <button
                                         type="button"
@@ -300,7 +298,7 @@ const Rooms = () => {
                             <button
                                 type="submit"
                                 className="w-full text-background py-3.5 md:py-4.5 rounded-2xl font-bold text-base md:text-lg transition-all active:scale-[0.98] shadow-lg"
-                                style={{ backgroundColor: createThemeColor, boxShadow: `0 0 30px ${createThemeColor}20` }}
+                                style={{ backgroundColor: settings.accentColor, boxShadow: `0 0 30px ${settings.accentColor}20` }}
                                 onMouseEnter={(e) => e.target.style.filter = 'brightness(1.1)'}
                                 onMouseLeave={(e) => e.target.style.filter = 'none'}
                             >
@@ -318,8 +316,8 @@ const Rooms = () => {
                         <div className="space-y-6">
                             <div className="flex items-center gap-4">
                                 <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                                    style={{ backgroundColor: `${joinThemeColor}0d` }}>
-                                    <Users style={{ color: joinThemeColor }} size={20} />
+                                    style={{ backgroundColor: `${settings.accentColor}0d` }}>
+                                    <Users style={{ color: settings.accentColor }} size={20} />
                                 </div>
                                 <h2 className="text-xl md:text-2xl font-bold text-text-main tracking-tight">Join Room</h2>
                             </div>
@@ -332,13 +330,13 @@ const Rooms = () => {
                                     placeholder="ENTER CODE"
                                     className="w-full bg-background border border-border rounded-2xl py-4 px-5 md:px-6 text-text-main placeholder:text-text-main-muted focus:outline-none transition-all font-bold tracking-[0.3em] text-xs md:text-sm uppercase"
                                     style={{ borderColor: `${joinThemeColor}14` }}
-                                    onFocus={(e) => e.target.style.borderColor = joinThemeColor}
+                                    onFocus={(e) => e.target.style.borderColor = settings.accentColor}
                                     onBlur={(e) => e.target.style.borderColor = `${joinThemeColor}14`}
                                 />
                                 <button
                                     onClick={handleJoinRoom}
                                     className="absolute right-2.5 top-1/2 -translate-y-1/2 w-12 h-12 text-background rounded-xl md:rounded-2xl flex items-center justify-center transition-all active:scale-95 shadow-lg group"
-                                    style={{ backgroundColor: joinThemeColor }}
+                                    style={{ backgroundColor: settings.accentColor }}
                                     onMouseEnter={(e) => {
                                         e.currentTarget.style.filter = 'brightness(1.1)';
                                         e.currentTarget.querySelector('svg').style.transform = 'translateX(2px) scale(1.1)';
@@ -355,8 +353,8 @@ const Rooms = () => {
                             {/* QR Placeholder */}
                             <div className="aspect-[21/9] bg-background border border-dashed border-border rounded-2xl flex flex-col items-center justify-center gap-3 group cursor-pointer transition-colors"
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.borderColor = `${joinThemeColor}2a`;
-                                    e.currentTarget.querySelector('svg').style.color = joinThemeColor;
+                                    e.currentTarget.style.borderColor = `${settings.accentColor}2a`;
+                                    e.currentTarget.querySelector('svg').style.color = settings.accentColor;
                                 }}
                                 onMouseLeave={(e) => {
                                     e.currentTarget.style.borderColor = 'var(--border-color)';
@@ -376,7 +374,7 @@ const Rooms = () => {
                                     onChange={(e) => setNickname(e.target.value)}
                                     className="w-full bg-background border border-border rounded-xl py-3 px-4 text-sm text-text-main focus:outline-none transition-all"
                                     style={{ borderColor: 'var(--border-color)' }}
-                                    onFocus={(e) => e.target.style.borderColor = joinThemeColor}
+                                    onFocus={(e) => e.target.style.borderColor = settings.accentColor}
                                     onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
                                 />
                             </div>

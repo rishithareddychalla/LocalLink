@@ -12,8 +12,8 @@ const storage = multer.diskStorage({
         cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
-        // Use UUID as server-side filename for storage security
-        cb(null, uuidv4());
+        const uniqueName = Date.now() + "-" + file.originalname;
+        cb(null, uniqueName);
     }
 });
 

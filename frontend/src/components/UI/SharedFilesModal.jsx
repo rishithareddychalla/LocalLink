@@ -3,10 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, FileText, AlertTriangle, ShieldCheck, UploadCloud, Download } from 'lucide-react';
 import { useRoom } from '../../context/RoomContext';
 import { useFiles } from '../../context/FileContext';
+import { useProfile } from '../../context/ProfileContext';
 
 const SharedFilesModal = ({ isOpen, onClose, activeTheme }) => {
     const { activeRoom, roomFiles } = useRoom();
     const { trackDownload } = useFiles();
+    const { profile } = useProfile();
 
     if (!isOpen) return null;
 
@@ -47,9 +49,12 @@ const SharedFilesModal = ({ isOpen, onClose, activeTheme }) => {
                     ) : (
                         [...roomFiles].reverse().map((file) => (
                             <div key={file.id} className="bg-surface/50 rounded-2xl p-4 flex items-center gap-4 border border-border hover:border-primary/20 transition-all group">
-                                <div className={`p-3 rounded-xl shrink-0 ${file.isSafe ? "bg-primary/10" : "bg-red-500/10"}`}>
+                                <div
+                                    className="p-3 rounded-xl shrink-0"
+                                    style={file.isSafe ? { backgroundColor: `${activeTheme}10` } : { backgroundColor: 'rgba(239, 68, 68, 0.1)' }}
+                                >
                                     {file.isSafe ? (
-                                        <FileText size={20} className="text-primary" />
+                                        <FileText size={20} style={{ color: activeTheme }} />
                                     ) : (
                                         <AlertTriangle size={20} className="text-red-500" />
                                     )}
@@ -66,7 +71,7 @@ const SharedFilesModal = ({ isOpen, onClose, activeTheme }) => {
                                     <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider text-text-main-muted/30">
                                         <span>{(file.size / 1024 / 1024).toFixed(2)} MB</span>
                                         <span className="w-1 h-1 rounded-full bg-text/10" />
-                                        <span>Uploaded by {file.uploadedBy === 'Me' ? 'You' : file.uploadedBy}</span>
+                                        <span>Uploaded by {file.uploadedBy === profile.id ? 'You' : file.uploadedBy}</span>
                                     </div>
                                 </div>
 
@@ -75,7 +80,9 @@ const SharedFilesModal = ({ isOpen, onClose, activeTheme }) => {
                                         href={file.downloadUrl}
                                         download={file.name}
                                         onClick={() => activeRoom && trackDownload(activeRoom.id, file)}
-                                        className="w-10 h-10 rounded-xl bg-text/5 hover:bg-text/10 flex items-center justify-center text-text-main-muted/40 hover:text-primary transition-all active:scale-95"
+                                        className="w-10 h-10 rounded-xl bg-text/5 hover:bg-text/10 flex items-center justify-center text-text-main-muted/40 transition-all active:scale-95"
+                                        onMouseEnter={(e) => e.currentTarget.style.color = activeTheme}
+                                        onMouseLeave={(e) => e.currentTarget.style.color = ''}
                                     >
                                         <Download size={18} />
                                     </a>

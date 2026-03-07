@@ -3,6 +3,8 @@ import { getUserFiles, addFileToHistory } from '../utils/filePersistence';
 import { scanFileBeforeDownload } from '../utils/securityScan';
 import { useNotifications } from './NotificationContext';
 import { useNetworkLog } from './NetworkLogContext';
+import { useProfile } from './ProfileContext';
+import { SessionContext } from './SessionContext';
 import { apiUpload } from '../services/api';
 
 const FileContext = createContext();
@@ -16,6 +18,8 @@ export const FileProvider = ({ children }) => {
     const [blockedFiles, setBlockedFiles] = useState(new Set());
     const { addNotification } = useNotifications();
     const { addLogEvent } = useNetworkLog();
+    const { profile } = useProfile();
+    const { token } = useContext(SessionContext);
 
     // Revoke Blob URLs (Legacy, but kept for cleanup)
     const revokeRoomFiles = useCallback((roomId) => {
@@ -31,21 +35,19 @@ export const FileProvider = ({ children }) => {
             const formData = new FormData();
             formData.append('file', file);
             formData.append('roomId', roomId);
+            formData.append('userId', profile.id); // Use real user ID
 
             const response = await apiUpload('/files/upload', formData);
             if (response.success) {
-                // The backend returns the file metadata
-                // We'll let the socket event 'new_file' handle adding it to the UI for everyone,
-                // but we can add it here for immediate feedback if needed.
                 addLogEvent("Transfer", "File Uploaded", `Uploaded ${file.name}`);
 
                 // Add to persistent history
                 const metadata = {
                     id: response.data.id,
-                    name: response.data.fileName,
+                    name: response.data.name,
                     size: response.data.size,
                     type: file.type,
-                    uploadedBy: 'me',
+                    uploadedBy: profile.id,
                     roomId: roomId,
                     sharedAt: new Date().toISOString()
                 };
@@ -63,15 +65,22 @@ export const FileProvider = ({ children }) => {
     const addRoomFile = useCallback((roomId, fileData) => {
         setRoomFilesMap(prev => {
             const currentRoomFiles = prev[roomId] || [];
-            // Check for duplicates
             if (currentRoomFiles.some(f => f.id === fileData.id)) return prev;
+
+            // Ensure downloadUrl is present for the UI
+            const apiBase = window.location.origin.replace('5173', '5000');
+            const downloadUrl = fileData.downloadUrl || `${apiBase}/api/files/download/${fileData.id}`;
+            const fileWithUrl = {
+                ...fileData,
+                downloadUrl: token ? `${downloadUrl}?token=${token}` : downloadUrl
+            };
 
             return {
                 ...prev,
-                [roomId]: [fileData, ...currentRoomFiles]
+                [roomId]: [fileWithUrl, ...currentRoomFiles]
             };
         });
-    }, []);
+    }, [token]);
 
     const trackDownload = useCallback((roomId, file) => {
         // Security Scan before allowing download
@@ -87,12 +96,12 @@ export const FileProvider = ({ children }) => {
                 timestamp: Date.now()
             });
             addLogEvent("Security", "Threat Blocked", `Blocked ${file.name} - ${scanResult.reason}`);
-            return false; // Prevent download
+            return false;
         }
 
         const metadata = {
             id: file.id,
-            name: file.name || file.fileName,
+            name: file.name,
             size: file.size,
             type: file.type,
             uploadedBy: file.uploadedBy,
@@ -100,13 +109,31 @@ export const FileProvider = ({ children }) => {
             downloadedAt: new Date().toISOString()
         };
         addFileToHistory('downloaded', metadata);
-        setUserFiles(getUserFiles()); // Refresh state
+        setUserFiles(getUserFiles());
         addLogEvent("Transfer", "File Downloaded", `Downloaded ${metadata.name}`);
 
-        // Open the real download URL from the backend
-        window.open(`http://localhost:5000/api/files/download/${file.id}`, '_blank');
+        addNotification({
+            type: "download",
+            title: "File Downloaded",
+            message: `You downloaded ${metadata.name}`,
+            fileName: metadata.name,
+            timestamp: Date.now()
+        });
+
+        // Open the real download URL from the backend using a hidden anchor tag
+        const apiBase = window.location.origin.replace('5173', '5000');
+        const downloadUrl = `${apiBase}/api/files/download/${file.id}`;
+        const finalUrl = token ? `${downloadUrl}?token=${token}` : downloadUrl;
+
+        const link = document.createElement('a');
+        link.href = finalUrl;
+        link.setAttribute('download', file.name); // Suggest the filename
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
         return true;
-    }, [addNotification, addLogEvent]);
+    }, [addNotification, addLogEvent, token]);
 
     return (
         <FileContext.Provider value={{

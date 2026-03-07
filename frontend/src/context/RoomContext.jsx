@@ -13,6 +13,7 @@ import {
 } from '../utils/persistRoomState';
 import { generateUniqueRoomId } from '../utils/generateRoomId';
 import { useFiles } from './FileContext';
+import { useNotifications } from './NotificationContext';
 
 
 const RoomContext = createContext();
@@ -28,6 +29,8 @@ export const RoomProvider = ({ children }) => {
     const [roomRegistry, setRoomRegistry] = useState(getRoomRegistry());
     const [generatedId, setGeneratedId] = useState('');
     const [roomClosureReason, setRoomClosureReason] = useState(null);
+    const [roomAccentColor, setRoomAccentColor] = useState('#22d3ee');
+    const [typingParticipants, setTypingParticipants] = useState({}); // { userId: nickname }
 
     useEffect(() => {
         setGeneratedId(generateUniqueRoomId(roomRegistry));
@@ -40,6 +43,7 @@ export const RoomProvider = ({ children }) => {
 
     const { profile } = useProfile();
     const { addLogEvent } = useNetworkLog();
+    const { addNotification } = useNotifications();
 
     const [chatMessages, setChatMessages] = useState([]);
 
@@ -47,17 +51,20 @@ export const RoomProvider = ({ children }) => {
         if (!activeRoom || !text.trim()) return;
 
         const messageData = {
-            id: `msg-${Date.now()}`,
-            user: profile.nickname,
+            roomId: activeRoom.id,
             userId: profile.id,
-            message: text,
-            timestamp: new Date().toISOString()
+            nickname: profile.nickname,
+            avatar: profile.avatar,
+            message: text
         };
 
         if (socketRef.current) {
             socketRef.current.emit('send_message', {
                 roomId: activeRoom.id,
-                message: messageData
+                userId: profile.id,
+                nickname: profile.nickname,
+                avatar: profile.avatar,
+                message: text
             });
         }
     }, [activeRoom, profile]);
@@ -89,6 +96,8 @@ export const RoomProvider = ({ children }) => {
             setChatMessages([]);
             setDrawpadStrokes([]);
             setRoomMetadataState(null);
+            setRoomAccentColor('#22d3ee');
+            setTypingParticipants({});
             clearRoomMetadata();
             setTimeLeft(0);
 
@@ -121,6 +130,15 @@ export const RoomProvider = ({ children }) => {
                     avatar: profile.avatar,
                     status: profile.status
                 });
+
+                // Re-join active room on reconnect
+                if (activeRoom?.id) {
+                    console.log('[RoomContext] Re-joining room on connect:', activeRoom.id);
+                    socket.emit('join_room', {
+                        roomId: activeRoom.id,
+                        user: profile
+                    });
+                }
             }
         });
 
@@ -137,8 +155,24 @@ export const RoomProvider = ({ children }) => {
             setParticipants(participants);
         });
 
+        socket.on('room_messages', (messages) => {
+            setChatMessages(messages);
+        });
+
         socket.on('receive_message', (message) => {
             setChatMessages(prev => [...prev, message]);
+        });
+
+        socket.on('typing_update', ({ userId, nickname, isTyping }) => {
+            setTypingParticipants(prev => {
+                const next = { ...prev };
+                if (isTyping) {
+                    next[userId] = nickname;
+                } else {
+                    delete next[userId];
+                }
+                return next;
+            });
         });
 
         socket.on('room_expired', () => {
@@ -157,9 +191,18 @@ export const RoomProvider = ({ children }) => {
             setDrawpadStrokes(prev => [...prev, stroke]);
         });
 
-        socket.on('new_file', ({ file }) => {
+        socket.on('file_uploaded', (file) => {
             if (activeRoom) {
                 addRoomFile(activeRoom.id, file);
+
+                // Add notification for everyone in the room
+                addNotification({
+                    type: "upload",
+                    title: "New File Shared",
+                    message: `${file.uploadedBy === profile.id ? 'You' : file.uploadedBy} uploaded ${file.name}`,
+                    fileName: file.name,
+                    timestamp: Date.now()
+                });
             }
         });
 
@@ -168,6 +211,7 @@ export const RoomProvider = ({ children }) => {
             socket.off('disconnect');
             socket.off('user_joined');
             socket.off('user_left');
+            socket.off('room_messages');
             socket.off('receive_message');
             socket.off('room_expired');
             socket.off('room_closed');
@@ -218,6 +262,7 @@ export const RoomProvider = ({ children }) => {
                 isPrivate: roomData.isPrivate,
                 password: roomData.password,
                 expiry: roomData.expiry,
+                accentColor: roomData.accentColor,
                 creatorSocketId: socketRef.current?.id
             });
 
@@ -225,10 +270,9 @@ export const RoomProvider = ({ children }) => {
                 const newRoom = response.data;
                 setActiveRoom(newRoom);
                 setRoomMetadataState({
-                    roomId: newRoom.id,
-                    roomName: newRoom.name,
                     expiresAt: newRoom.expiresAt
                 });
+                setRoomAccentColor(newRoom.accentColor || '#22d3ee');
                 setParticipants(newRoom.participants || []);
 
                 if (socketRef.current) {
@@ -265,10 +309,9 @@ export const RoomProvider = ({ children }) => {
                 const joinedRoom = response.data;
                 setActiveRoom(joinedRoom);
                 setRoomMetadataState({
-                    roomId: joinedRoom.id,
-                    roomName: joinedRoom.name,
                     expiresAt: joinedRoom.expiresAt
                 });
+                setRoomAccentColor(joinedRoom.accentColor || '#22d3ee');
                 setParticipants(joinedRoom.participants || []);
 
                 if (socketRef.current) {
@@ -315,6 +358,17 @@ export const RoomProvider = ({ children }) => {
         setGeneratedId(generateUniqueRoomId(roomRegistry));
     }, [roomRegistry]);
 
+    const setTyping = (isTyping) => {
+        if (socketRef.current && activeRoom) {
+            socketRef.current.emit('typing', {
+                roomId: activeRoom.id,
+                userId: profile.id,
+                nickname: profile.nickname,
+                isTyping
+            });
+        }
+    };
+
     return (
         <RoomContext.Provider value={{
             activeRoom,
@@ -329,7 +383,10 @@ export const RoomProvider = ({ children }) => {
             generatedId,
             roomRegistry,
             roomClosureReason,
+            roomAccentColor,
+            typingParticipants,
             setRoomClosureReason,
+            setTyping,
             createRoom,
             joinRoom,
             leaveRoom,

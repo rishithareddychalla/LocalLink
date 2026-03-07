@@ -62,6 +62,9 @@ const RoomInterface = () => {
         timeLeft,
         userRoomPreferences,
         roomClosureReason,
+        roomAccentColor,
+        typingParticipants,
+        setTyping,
         setRoomClosureReason
     } = useRoom();
 
@@ -106,7 +109,8 @@ const RoomInterface = () => {
     const [isMobile, setIsMobile] = useState(false);
 
     // Current Room Theme
-    const activeTheme = userRoomPreferences?.selectedTheme || '#2563EB';
+    const activeTheme = roomAccentColor || '#00f0ff';
+    const globalAccentColor = "#00f0ff"; // Optional: could fetch from settings if needed
 
     useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth < 1024);
@@ -125,6 +129,21 @@ const RoomInterface = () => {
 
     const [showClosureToast, setShowClosureToast] = useState(false);
     const [closureMessage, setClosureMessage] = useState('');
+
+    const [fileToast, setFileToast] = useState(null);
+
+    // Watch for new notifications to show file toasts
+    useEffect(() => {
+        if (notifications.length > 0) {
+            const latest = notifications[0];
+            const isRecent = Date.now() - latest.timestamp < 2000;
+            if (isRecent && (latest.type === 'upload' || latest.type === 'download')) {
+                setFileToast(latest);
+                const timer = setTimeout(() => setFileToast(null), 4000);
+                return () => clearTimeout(timer);
+            }
+        }
+    }, [notifications]);
 
     // Room Closure Redirection (e.g., Creator Left)
     useEffect(() => {
@@ -162,78 +181,9 @@ const RoomInterface = () => {
         setMessage('');
     };
 
-    const ChatPanel = () => (
-        <div className="flex flex-col h-full bg-surface lg:border border-border lg:rounded-2xl overflow-hidden shrink-0 w-full lg:w-80">
-            <div className="p-4 border-b border-border flex items-center justify-between">
-                <div>
-                    <h2 className="text-sm font-bold text-text-main leading-none mb-1">Room Chat</h2>
-                    <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: activeTheme }}>128-bit Encrypted</span>
-                </div>
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-6 no-scrollbar">
-                {chatMessages.length === 0 && (
-                    <div className="h-full flex flex-col items-center justify-center opacity-20 py-8">
-                        <MessageSquare size={32} className="mb-2" />
-                        <p className="text-[10px] font-bold uppercase tracking-widest">No messages yet</p>
-                    </div>
-                )}
-                {chatMessages.map((chat) => {
-                    const isMe = chat.userId === profile.id;
-                    const userTheme = getUserTheme(chat.user);
-                    return (
-                        <div key={chat.id} className={cn("flex flex-col", isMe ? "items-end" : "items-start")}>
-                            <div className="flex items-center gap-1.5 mb-1 awareness-indicator">
-                                <span className="text-[10px] font-bold text-text-main-muted">{chat.user}</span>
-                                {!isMe && <div className="w-1 h-1 rounded-full animate-pulse" style={{ backgroundColor: userTheme }} />}
-                            </div>
-                            <div
-                                className={cn(
-                                    "px-4 py-2.5 text-sm max-w-[85%] shadow-lg transition-all hover:scale-[1.02]",
-                                    isMe
-                                        ? "text-black font-semibold rounded-2xl rounded-tr-sm"
-                                        : "text-text-main/90 rounded-2xl rounded-tl-sm border border-border"
-                                )}
-                                style={{
-                                    backgroundColor: isMe ? activeTheme : `${userTheme}15`,
-                                    borderColor: isMe ? 'transparent' : `${userTheme}30`,
-                                    boxShadow: isMe ? `0 10px 15px -3px ${activeTheme}40` : 'none'
-                                }}
-                            >
-                                {chat.message}
-                            </div>
-                        </div>
-                    );
-                })}
-                <div ref={chatEndRef} />
-            </div>
-
-            <div className="p-4 bg-background border-t border-border relative">
-                <input
-                    type="text"
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    onKeyDown={handleSendMessage}
-                    placeholder="Message..."
-                    className="w-full bg-surface border border-border/50 rounded-full py-3.5 pl-5 pr-12 text-sm text-text-main focus:outline-none transition-colors placeholder:text-text-main-muted/20"
-                    style={{ borderColor: `${activeTheme}20` }}
-                    onFocus={(e) => e.target.style.borderColor = activeTheme}
-                    onBlur={(e) => e.target.style.borderColor = ''}
-                />
-                <button
-                    onClick={() => handleSendMessage()}
-                    className="absolute right-6 top-1/2 -translate-y-1/2 w-8 h-8 text-black rounded-full flex items-center justify-center hover:opacity-90 active:scale-90 transition-all"
-                    style={{ backgroundColor: activeTheme }}
-                >
-                    <Send size={14} />
-                </button>
-            </div>
-        </div>
-    );
 
     const InfoPanel = () => (
-        <div className="flex flex-col gap-6 shrink-0 w-full lg:w-96">
+        <div className="flex flex-col gap-6 shrink-0 w-full lg:w-96 lg:h-full">
             <div className="bg-surface border border-border rounded-2xl p-5 lg:flex-1 flex flex-col min-h-0">
                 <div className="flex items-center justify-between mb-6 shrink-0">
                     <h2 className="text-xs font-bold text-text-main uppercase tracking-widest">Secure Transfer</h2>
@@ -259,14 +209,14 @@ const RoomInterface = () => {
                     <p className="text-[10px] font-bold text-text-main-muted uppercase tracking-widest group-hover:text-text-main transition-colors">Beam Assets</p>
                 </div>
 
-                <div className="space-y-3 overflow-y-auto no-scrollbar flex-1">
+                <div className="space-y-3 overflow-y-auto custom-scrollbar flex-1">
                     {roomFiles.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center opacity-20 py-8">
                             <FileText size={40} className="mb-2" />
                             <p className="text-[10px] font-bold uppercase tracking-widest">No assets shared</p>
                         </div>
                     ) : (
-                        [...roomFiles].reverse().slice(0, 3).map((file) => (
+                        [...roomFiles].reverse().map((file) => (
                             <div key={file.id} className={cn(
                                 "bg-background/60 rounded-xl p-3 flex items-center gap-3 border transition-all",
                                 file.isSafe ? "border-border" : "border-red-500/20 bg-red-500/5"
@@ -294,7 +244,7 @@ const RoomInterface = () => {
                                         )}
                                     </div>
                                     <p className="text-[9px] text-text-main-muted font-bold uppercase">
-                                        {(file.size / 1024 / 1024).toFixed(1)} MB • {file.uploadedBy === 'Me' ? 'Local' : 'Peer'}
+                                        {(file.size / 1024 / 1024).toFixed(1)} MB • {file.uploadedBy === profile.id ? 'Local' : 'Peer'}
                                     </p>
                                 </div>
                                 {file.isSafe && file.downloadUrl !== '#' ? (
@@ -306,7 +256,7 @@ const RoomInterface = () => {
                                         onMouseEnter={(e) => e.currentTarget.style.color = activeTheme}
                                         onMouseLeave={(e) => e.currentTarget.style.color = ''}
                                     >
-                                        <Download size={14} className="rotate-180" />
+                                        <Download size={14} />
                                     </a>
                                 ) : (
                                     <div className="p-1.5 flex items-center justify-center">
@@ -356,7 +306,7 @@ const RoomInterface = () => {
     );
 
     return (
-        <div className="flex flex-col min-h-[calc(100vh-120px)] lg:min-h-[calc(100vh-140px)] bg-background overflow-y-auto custom-scrollbar pb-8">
+        <div className="flex flex-col h-[calc(100vh-120px)] lg:h-[calc(100vh-160px)] bg-background overflow-hidden pb-4">
             {/* Header */}
             <header className="flex flex-col sm:flex-row items-center justify-between mb-4 md:mb-6 gap-4 shrink-0">
                 <div className="flex items-center gap-4 w-full sm:w-auto">
@@ -368,8 +318,8 @@ const RoomInterface = () => {
                     </div>
                     <div className="flex-1">
                         <h1 className="text-lg md:text-xl font-black text-text-main tracking-tight uppercase truncate flex items-baseline gap-2">
-                            {roomMetadata?.roomName || 'Active Room'}
-                            <span className="text-[10px] md:text-xs font-mono text-text-main-muted/40 tracking-normal normal-case font-medium">#{roomMetadata?.roomId}</span>
+                            {roomMetadata?.roomName || activeRoom?.name || 'Active Room'}
+                            <span className="text-[10px] md:text-xs font-mono text-text-main-muted/40 tracking-normal normal-case font-medium">#{roomMetadata?.roomId || activeRoom?.id}</span>
                         </h1>
                         <div className="flex items-center gap-2">
                             <span className="text-[9px] font-black tracking-widest" style={{ color: activeTheme }}>ENCRYPTED TUNNEL</span>
@@ -397,7 +347,9 @@ const RoomInterface = () => {
                         >
                             <Bell size={16} style={{ color: activeTheme }} />
                             {unreadCount > 0 && (
-                                <span className="absolute top-2 right-2.5 w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                                <span className="absolute top-2 right-2.5 w-1.5 h-1.5 rounded-full animate-pulse"
+                                    style={{ backgroundColor: activeTheme }}
+                                />
                             )}
                         </button>
 
@@ -425,16 +377,17 @@ const RoomInterface = () => {
                                                     onClick={() => markAsRead(n.id)}
                                                     className={cn(
                                                         "p-4 border-b border-border hover:bg-text/5 cursor-pointer transition-colors relative",
-                                                        !n.read && "bg-primary/5"
+                                                        !n.read && "bg-surface"
                                                     )}
+                                                    style={!n.read ? { backgroundColor: `${activeTheme}05` } : {}}
                                                 >
-                                                    {!n.read && <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-primary" />}
+                                                    {!n.read && <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ backgroundColor: activeTheme }} />}
                                                     <div className="flex items-center gap-3 mb-1">
                                                         <div className={cn("w-2 h-2 rounded-full", n.type === 'threat' ? "bg-red-500" : "bg-blue-500")} />
                                                         <p className="text-[10px] font-bold text-text-main-muted/60 uppercase tracking-widest">{n.title}</p>
                                                     </div>
                                                     <p className="text-sm text-text-main font-medium mb-1 line-clamp-2">{n.message}</p>
-                                                    {n.fileName && <p className="text-[10px] text-primary/60 font-mono italic mb-1">{n.fileName}</p>}
+                                                    {n.fileName && <p className="text-[10px] font-mono italic mb-1" style={{ color: `${activeTheme}99` }}>{n.fileName}</p>}
                                                     <p className="text-[9px] text-text-main-muted/20 font-bold uppercase">{new Date(n.timestamp).toLocaleTimeString()}</p>
                                                 </div>
                                             ))
@@ -498,7 +451,137 @@ const RoomInterface = () => {
                             exit={isMobile ? { opacity: 0, x: -20 } : {}}
                             className={cn(isMobile ? "absolute inset-0 z-10" : "flex h-full")}
                         >
-                            <ChatPanel />
+                            <div className="flex flex-col h-full bg-surface lg:border border-border lg:rounded-2xl overflow-hidden shrink-0 w-full lg:w-80">
+                                <div className="p-4 border-b border-border flex items-center justify-between">
+                                    <div>
+                                        <h2 className="text-sm font-bold text-text-main leading-none mb-1">Room Chat</h2>
+                                        <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: activeTheme }}>128-bit Encrypted</span>
+                                    </div>
+                                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
+                                    {chatMessages.length === 0 && (
+                                        <div className="h-full flex flex-col items-center justify-center opacity-20 py-8">
+                                            <MessageSquare size={32} className="mb-2" />
+                                            <p className="text-[10px] font-bold uppercase tracking-widest">No messages yet</p>
+                                        </div>
+                                    )}
+                                    {chatMessages.map((chat) => {
+                                        if (chat.type === 'system') {
+                                            return (
+                                                <div key={chat.id} className="flex justify-center my-2">
+                                                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-text-main-muted/30 bg-text/5 px-3 py-1 rounded-full border border-border/50">
+                                                        {chat.message}
+                                                    </span>
+                                                </div>
+                                            );
+                                        }
+
+                                        const isMe = chat.userId === profile.id;
+                                        const userTheme = getUserTheme(chat.nickname);
+                                        const avatarUrl = chat.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${chat.nickname}`;
+
+                                        return (
+                                            <div key={chat.id} className={cn("flex gap-3", isMe ? "flex-row-reverse" : "flex-row")}>
+                                                {/* Avatar */}
+                                                <div className="shrink-0 mt-1">
+                                                    <div className="w-8 h-8 rounded-full border border-border bg-surface overflow-hidden">
+                                                        <img src={avatarUrl} alt={chat.nickname} className="w-full h-full object-cover" />
+                                                    </div>
+                                                </div>
+
+                                                <div className={cn("flex flex-col max-w-[75%]", isMe ? "items-end" : "items-start")}>
+                                                    <div className="flex items-center gap-1.5 mb-1 awareness-indicator">
+                                                        <span className="text-[10px] font-bold text-text-main">{chat.nickname}</span>
+                                                        <span className="text-[8px] font-medium text-text-main-muted/50">
+                                                            {chat.timestamp ? new Date(chat.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                                                        </span>
+                                                    </div>
+                                                    <div
+                                                        className={cn(
+                                                            "px-4 py-2.5 text-sm shadow-lg transition-all hover:scale-[1.02]",
+                                                            isMe
+                                                                ? "text-white font-semibold rounded-2xl rounded-tr-sm"
+                                                                : "text-text-main/90 rounded-2xl rounded-tl-sm border border-border"
+                                                        )}
+                                                        style={{
+                                                            backgroundColor: isMe ? activeTheme : `${userTheme}15`,
+                                                            borderColor: isMe ? 'transparent' : `${userTheme}30`,
+                                                            boxShadow: isMe ? `0 10px 15px -3px ${activeTheme}40` : 'none'
+                                                        }}
+                                                    >
+                                                        {chat.message}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                    <div ref={chatEndRef} />
+                                </div>
+
+                                <div className="p-4 bg-background border-t border-border relative">
+                                    <div className="absolute -top-6 left-4 flex items-center gap-1.5 pointer-events-none">
+                                        <AnimatePresence>
+                                            {Object.keys(typingParticipants).length > 0 && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: 5 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: 5 }}
+                                                    className="flex items-center gap-2"
+                                                >
+                                                    <div className="flex gap-0.5">
+                                                        {[0, 1, 2].map((i) => (
+                                                            <motion.div
+                                                                key={i}
+                                                                animate={{ opacity: [0.2, 1, 0.2] }}
+                                                                transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                                                                className="w-1 h-1 rounded-full"
+                                                                style={{ backgroundColor: activeTheme }}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                    <span className="text-[9px] font-bold uppercase tracking-widest opacity-40" style={{ color: activeTheme }}>
+                                                        {Object.values(typingParticipants).join(', ')} {Object.keys(typingParticipants).length > 1 ? 'are typing...' : 'is typing...'}
+                                                    </span>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        value={message}
+                                        onChange={(e) => {
+                                            setMessage(e.target.value);
+                                            setTyping(e.target.value.length > 0);
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                handleSendMessage();
+                                                setTyping(false);
+                                            }
+                                        }}
+                                        onBlur={() => {
+                                            setTyping(false);
+                                            // existing onBlur logic
+                                        }}
+                                        placeholder="Message..."
+                                        className="w-full bg-surface border border-border/50 rounded-full py-3.5 pl-5 pr-12 text-sm text-text-main focus:outline-none transition-colors placeholder:text-text-main-muted/20"
+                                        style={{ borderColor: `${activeTheme}20` }}
+                                        onFocus={(e) => e.target.style.borderColor = activeTheme}
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            handleSendMessage();
+                                            setTyping(false);
+                                        }}
+                                        className="absolute right-6 top-1/2 -translate-y-1/2 w-8 h-8 text-black rounded-full flex items-center justify-center hover:opacity-90 active:scale-90 transition-all font-bold"
+                                        style={{ backgroundColor: activeTheme }}
+                                    >
+                                        <Send size={14} className="stroke-[3]" />
+                                    </button>
+                                </div>
+                            </div>
                         </motion.div>
                     )}
 
@@ -615,7 +698,7 @@ const RoomInterface = () => {
                             initial={isMobile ? { opacity: 0, x: 20 } : {}}
                             animate={{ opacity: 1, x: 0 }}
                             exit={isMobile ? { opacity: 0, x: 20 } : {}}
-                            className={cn(isMobile ? "absolute inset-0 z-10 overflow-y-auto no-scrollbar" : "flex flex-col")}
+                            className={cn(isMobile ? "absolute inset-0 z-10 overflow-y-auto custom-scrollbar" : "flex-1 flex flex-col min-h-0")}
                         >
                             <InfoPanel />
                         </motion.div>
@@ -629,6 +712,52 @@ const RoomInterface = () => {
                 onClose={() => setShowAllFilesModal(false)}
                 activeTheme={activeTheme}
             />
+
+            {/* File Event Toast */}
+            <AnimatePresence>
+                {fileToast && (
+                    <motion.div
+                        initial={{ opacity: 0, x: 50, scale: 0.9 }}
+                        animate={{ opacity: 1, x: 0, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        className="fixed top-24 right-10 z-[100] bg-surface/90 border border-border shadow-2xl rounded-2xl p-4 flex items-center gap-4 backdrop-blur-xl min-w-[300px]"
+                        style={{ borderColor: `${activeTheme}40` }}
+                    >
+                        <div
+                            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                            style={{ backgroundColor: `${activeTheme}20` }}
+                        >
+                            {fileToast.type === 'upload' ? (
+                                <UploadCloud size={20} style={{ color: activeTheme }} />
+                            ) : (
+                                <Download size={20} style={{ color: activeTheme }} />
+                            )}
+                        </div>
+                        <div>
+                            <h3 className="text-[10px] font-black text-text-main-muted uppercase tracking-widest leading-none mb-1">
+                                {fileToast.title}
+                            </h3>
+                            <p className="text-sm text-text-main font-bold truncate max-w-[200px]">
+                                {fileToast.message}
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setFileToast(null)}
+                            className="ml-auto text-text-main-muted hover:text-text-main transition-colors"
+                        >
+                            <X size={16} />
+                        </button>
+                        {/* Progress Bar */}
+                        <motion.div
+                            initial={{ width: "100%" }}
+                            animate={{ width: "0%" }}
+                            transition={{ duration: 4, ease: "linear" }}
+                            className="absolute bottom-0 left-0 h-1 rounded-full"
+                            style={{ backgroundColor: activeTheme }}
+                        />
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Room Closure Toast */}
             <AnimatePresence>

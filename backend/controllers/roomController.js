@@ -1,11 +1,12 @@
 const roomStore = require('../store/roomStore');
-const { files: filesMap } = require('../store/memoryStore');
+const filesMap = require('../store/fileStore');
+const messageStore = require('../store/messageStore');
 const generateRoomId = require('../utils/generateRoomId');
 const fs = require('fs');
 const path = require('path');
 
 const createRoom = (req, res) => {
-    const { name, isPrivate, password, expiryTime: expiryInput, expiry, id, creatorSocketId } = req.body;
+    const { name, isPrivate, password, expiryTime: expiryInput, expiry, id, creatorSocketId, accentColor } = req.body;
 
     if (!name) {
         return res.status(400).json({ success: false, error: 'Room name is required' });
@@ -39,7 +40,8 @@ const createRoom = (req, res) => {
         creatorName: req.user.nickname,
         creatorSocketId,
         expiryTime,
-        expiryTimeout
+        expiryTimeout,
+        accentColor: accentColor || '#22d3ee'
     };
 
     try {
@@ -59,7 +61,8 @@ const createRoom = (req, res) => {
                 creatorName: room.creatorName,
                 isPrivate: room.isPrivate,
                 createdAt: room.createdAt,
-                expiresAt: room.expiresAt
+                expiresAt: room.expiresAt,
+                accentColor: room.accentColor
             }
         });
     } catch (error) {
@@ -74,13 +77,16 @@ const cleanupRoom = (roomId, io, suppressNotify = false) => {
     // Delete associated files from storage and memory
     filesMap.forEach((file, fileId) => {
         if (file.roomId === roomId) {
-            const filePath = path.join(__dirname, '../uploads', file.id);
+            const filePath = file.path;
             if (fs.existsSync(filePath)) {
                 fs.unlinkSync(filePath);
             }
             filesMap.delete(fileId);
         }
     });
+
+    // Clear messages from store
+    messageStore.clearMessages(roomId);
 
     // Notify participants and broadast removal
     if (io) {

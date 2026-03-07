@@ -1,4 +1,4 @@
-const { files: filesMap } = require('../store/memoryStore');
+const filesMap = require('../store/fileStore');
 const { scanFile } = require('../utils/threatScanner');
 const path = require('path');
 const fs = require('fs');
@@ -8,26 +8,43 @@ const uploadFile = (req, res) => {
         return res.status(400).json({ success: false, error: 'No file uploaded' });
     }
 
-    const { roomId } = req.body;
-    const scanResult = scanFile(req.file);
+    const { roomId, userId } = req.body;
+    const io = req.app.get('io');
 
-    const file = {
-        id: req.file.filename,
+    const scanResult = scanFile(req.file);
+    const fileId = req.file.filename;
+
+    const fileMetadata = {
+        id: fileId,
         roomId,
-        fileName: req.file.originalname,
+        name: req.file.originalname,
+        path: req.file.path,
         size: req.file.size,
-        type: req.file.mimetype,
-        uploadedBy: req.user.id,
-        uploadedAt: new Date(),
+        uploadedBy: userId || req.user.id,
+        uploadedAt: Date.now(),
+        isSafe: scanResult.safe,
         isThreat: !scanResult.safe,
         threatReason: scanResult.safe ? null : scanResult.reason
     };
 
-    filesMap.set(file.id, file);
+    filesMap.set(fileId, fileMetadata);
+
+    // Broadcast file upload event
+    if (io) {
+        io.to(roomId).emit('file_uploaded', {
+            id: fileMetadata.id,
+            name: fileMetadata.name,
+            size: fileMetadata.size,
+            uploadedBy: fileMetadata.uploadedBy,
+            uploadedAt: fileMetadata.uploadedAt,
+            isSafe: fileMetadata.isSafe,
+            isThreat: fileMetadata.isThreat
+        });
+    }
 
     res.json({
         success: true,
-        data: file
+        data: fileMetadata
     });
 };
 
@@ -43,12 +60,11 @@ const downloadFile = (req, res) => {
         return res.status(403).json({ success: false, error: `Download blocked: ${file.threatReason}` });
     }
 
-    const filePath = path.join(__dirname, '../uploads', file.id);
-    if (!fs.existsSync(filePath)) {
+    if (!fs.existsSync(file.path)) {
         return res.status(404).json({ success: false, error: 'Physical file not found' });
     }
 
-    res.download(filePath, file.fileName);
+    res.download(file.path, file.name);
 };
 
 module.exports = { uploadFile, downloadFile };
