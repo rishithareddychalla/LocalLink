@@ -62,7 +62,7 @@ const RoomInterface = () => {
         timeLeft,
         userRoomPreferences,
         roomClosureReason,
-        roomAccentColor,
+        localRoomTheme,
         typingParticipants,
         setTyping,
         setRoomClosureReason
@@ -109,7 +109,7 @@ const RoomInterface = () => {
     const [isMobile, setIsMobile] = useState(false);
 
     // Current Room Theme
-    const activeTheme = roomAccentColor || '#00f0ff';
+    const activeTheme = localRoomTheme || '#00f0ff';
     const globalAccentColor = "#00f0ff"; // Optional: could fetch from settings if needed
 
     useEffect(() => {

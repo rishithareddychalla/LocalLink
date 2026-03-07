@@ -19,8 +19,7 @@ class RoomStore {
             password: roomData.password || null,
             participants: [],
             createdAt: new Date(),
-            expiresAt: new Date(Date.now() + (roomData.expiryTime || 30) * 60000),
-            accentColor: roomData.accentColor || '#22d3ee'
+            expiresAt: new Date(Date.now() + (roomData.expiryTime || 30) * 60000)
         };
         this.rooms.set(room.id, room);
         return room;
@@ -46,8 +45,7 @@ class RoomStore {
                     avatar: p.avatar
                 })),
                 createdAt: room.createdAt,
-                expiresAt: room.expiresAt,
-                accentColor: room.accentColor
+                expiresAt: room.expiresAt
             };
         });
     }
@@ -58,13 +56,19 @@ class RoomStore {
 
     addParticipant(roomId, user) {
         const room = this.rooms.get(roomId);
-        if (!room) return null;
+        if (!room) return { room: null, isNew: false };
 
-        const alreadyIn = room.participants.some(p => p.id === user.id);
-        if (!alreadyIn) {
+        const existingIndex = room.participants.findIndex(p => p.id === user.id);
+        let isNew = false;
+
+        if (existingIndex === -1) {
             room.participants.push(user);
+            isNew = true;
+        } else {
+            // Update the existing participant's socket ID (in case of reconnects)
+            room.participants[existingIndex].socketId = user.socketId;
         }
-        return room;
+        return { room, isNew };
     }
 
     removeParticipant(roomId, userId) {

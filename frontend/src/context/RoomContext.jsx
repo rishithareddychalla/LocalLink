@@ -29,7 +29,7 @@ export const RoomProvider = ({ children }) => {
     const [roomRegistry, setRoomRegistry] = useState(getRoomRegistry());
     const [generatedId, setGeneratedId] = useState('');
     const [roomClosureReason, setRoomClosureReason] = useState(null);
-    const [roomAccentColor, setRoomAccentColor] = useState('#22d3ee');
+    const [localRoomTheme, setLocalRoomTheme] = useState('#22d3ee');
     const [typingParticipants, setTypingParticipants] = useState({}); // { userId: nickname }
 
     useEffect(() => {
@@ -96,7 +96,7 @@ export const RoomProvider = ({ children }) => {
             setChatMessages([]);
             setDrawpadStrokes([]);
             setRoomMetadataState(null);
-            setRoomAccentColor('#22d3ee');
+            setLocalRoomTheme('#22d3ee');
             setTypingParticipants({});
             clearRoomMetadata();
             setTimeLeft(0);
@@ -142,9 +142,24 @@ export const RoomProvider = ({ children }) => {
             }
         });
 
-        socket.on('disconnect', () => {
-            console.log('[RoomContext] Socket disconnected');
+        socket.on('disconnect', (reason) => {
+            console.log('[RoomContext] Socket disconnected:', reason);
             addLogEvent("Network", "Disconnected", "Real-time bridge lost");
+
+            // Trigger connection lost page if it's an unexpected disconnect
+            if (reason === 'io server disconnect' || reason === 'transport close' || reason === 'transport error') {
+                window.dispatchEvent(new CustomEvent('llr_network_offline'));
+            }
+        });
+
+        socket.on('error', (err) => {
+            console.error('[RoomContext] Socket Critical Error:', err);
+            window.dispatchEvent(new CustomEvent('llr_system_error', {
+                detail: {
+                    errorCode: 'SOCKET_ERROR',
+                    trace: err.message || 'Real-time bridge failure'
+                }
+            }));
         });
 
         socket.on('user_joined', ({ participants }) => {
@@ -262,7 +277,6 @@ export const RoomProvider = ({ children }) => {
                 isPrivate: roomData.isPrivate,
                 password: roomData.password,
                 expiry: roomData.expiry,
-                accentColor: roomData.accentColor,
                 creatorSocketId: socketRef.current?.id
             });
 
@@ -272,7 +286,6 @@ export const RoomProvider = ({ children }) => {
                 setRoomMetadataState({
                     expiresAt: newRoom.expiresAt
                 });
-                setRoomAccentColor(newRoom.accentColor || '#22d3ee');
                 setParticipants(newRoom.participants || []);
 
                 if (socketRef.current) {
@@ -311,7 +324,6 @@ export const RoomProvider = ({ children }) => {
                 setRoomMetadataState({
                     expiresAt: joinedRoom.expiresAt
                 });
-                setRoomAccentColor(joinedRoom.accentColor || '#22d3ee');
                 setParticipants(joinedRoom.participants || []);
 
                 if (socketRef.current) {
@@ -383,9 +395,10 @@ export const RoomProvider = ({ children }) => {
             generatedId,
             roomRegistry,
             roomClosureReason,
-            roomAccentColor,
-            typingParticipants,
             setRoomClosureReason,
+            localRoomTheme,
+            setLocalRoomTheme,
+            typingParticipants,
             setTyping,
             createRoom,
             joinRoom,

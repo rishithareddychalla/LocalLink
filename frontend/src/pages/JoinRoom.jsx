@@ -19,9 +19,8 @@ const JoinRoom = () => {
     const navigate = useNavigate();
     const {
         joinRoom,
-        userRoomPreferences,
-        roomRegistry,
-        updatePreferences
+        updatePreferences,
+        setLocalRoomTheme
     } = useRoom();
     const { profile, updateNickname } = useProfile();
     const { settings } = useSettings();
@@ -51,29 +50,29 @@ const JoinRoom = () => {
     // Fetch room details if not in nearby/registry
     useEffect(() => {
         const fetchRoomDetails = async () => {
-            const registry = roomRegistry[roomId];
-
-            if (registry) {
-                const roomObj = { ...registry, name: registry.roomName, isPrivate: registry.isPrivate };
-                setRoomData(roomObj);
-                if (roomObj.accentColor) setThemeColor(roomObj.accentColor);
-                return;
-            }
-
             setLoadingRoom(true);
             const response = await getRoomAPI(roomId);
             if (response.success) {
                 setRoomData(response.data);
-                if (response.data.accentColor) setThemeColor(response.data.accentColor);
                 setError(null);
             } else {
-                setError(response.error || 'Room not found');
+                const errMsg = response.error || 'Room not found';
+                if (errMsg === 'Room not found' || errMsg.toLowerCase().includes('expired') || errMsg.toLowerCase().includes('closed')) {
+                    navigate('/404', {
+                        state: {
+                            title: 'Room Not Found',
+                            message: "The room you are trying to join doesn't exist, has been closed, or has expired."
+                        }
+                    });
+                    return;
+                }
+                setError(errMsg);
             }
             setLoadingRoom(false);
         };
 
         fetchRoomDetails();
-    }, [roomId, roomRegistry]);
+    }, [roomId]);
 
     const handleJoin = async (e) => {
         if (e) e.preventDefault();
@@ -83,7 +82,6 @@ const JoinRoom = () => {
                 id: profile.id,
                 nickname,
                 password,
-                accentColor: themeColor,
                 avatarStyle: profile.avatarStyle,
                 avatarSeed: profile.avatarSeed
             };
@@ -91,6 +89,7 @@ const JoinRoom = () => {
             // Persist nickname
             updatePreferences({ nickname });
             updateNickname(nickname);
+            setLocalRoomTheme(themeColor);
 
             const response = await joinRoom(roomId, userData);
             if (response.success) {
@@ -104,16 +103,7 @@ const JoinRoom = () => {
         }
     };
 
-    // Auto-join for Public Rooms (Requirement: Join immediately)
-    useEffect(() => {
-        if (roomData && !roomData.isPrivate && nickname.trim() && !loadingRoom && !error) {
-            // Delay slightly for UX so they see they are joining
-            const timer = setTimeout(() => {
-                handleJoin();
-            }, 800);
-            return () => clearTimeout(timer);
-        }
-    }, [roomData, loadingRoom]);
+    // Removed auto-join for Public Rooms - Join only on button click
 
     return (
         <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">

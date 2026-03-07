@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useRoom } from '../context/RoomContext';
 import { useProfile } from '../context/ProfileContext';
 import useNetwork from '../hooks/useNetwork';
@@ -23,12 +24,20 @@ const Dashboard = () => {
     } = useNetwork();
 
     const { rooms, loadingRooms, error: roomsError } = useRooms();
+    const location = useLocation();
 
     // Local State
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedDevice, setSelectedDevice] = useState(null);
     const [isCreateRoomOpen, setIsCreateRoomOpen] = useState(false);
     const [isInviteOpen, setIsInviteOpen] = useState(false);
+
+    // Auto-scan trigger from 404 page
+    useEffect(() => {
+        if (location.state?.autoScan && !isScanning) {
+            scanSubnet();
+        }
+    }, [location.state, isScanning, scanSubnet]);
 
     // Derived State: Filtering devices (Implementation of requirement 4)
     const filteredDevices = useMemo(() => {

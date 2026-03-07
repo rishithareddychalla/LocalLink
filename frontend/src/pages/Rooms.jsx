@@ -38,7 +38,8 @@ const Rooms = () => {
         joinRoom, // Added joinRoom
         userRoomPreferences,
         updatePreferences,
-        generatedId
+        generatedId,
+        setLocalRoomTheme
     } = useRoom();
 
     const { rooms } = useRooms();
@@ -81,10 +82,10 @@ const Rooms = () => {
             isPrivate,
             password: isPrivate ? password : '',
             expiry,
-            accentColor: createThemeColor,
             type: 'owner'
         };
 
+        setLocalRoomTheme(createThemeColor);
         const response = await createRoom(roomData);
         if (response.success) {
             addNotification({
@@ -117,28 +118,8 @@ const Rooms = () => {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const handleJoinDirectly = async (room) => {
-        // Requirements: If room.isPrivate === false, join immediately
-        if (!room.isPrivate && nickname.trim()) {
-            const userData = {
-                id: profile.id, // Use profile ID
-                nickname,
-                accentColor: joinThemeColor,
-                avatarStyle: profile.avatarStyle,
-                avatarSeed: profile.avatarSeed
-            };
-
-            // Persist nickname
-            updatePreferences({ nickname });
-
-            const response = await joinRoom(room.id, userData);
-            if (response.success) {
-                navigate(`/room/${room.id}`);
-                return;
-            }
-        }
-
-        // Otherwise go to JoinRoom page (for password entry or nickname setup)
+    const handleJoinDirectly = (room) => {
+        // Go to JoinRoom page for nickname and theme setup (Requirement: consistent join flow)
         navigate(`/join/${room.id}`);
     };
 

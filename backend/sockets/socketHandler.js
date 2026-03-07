@@ -86,28 +86,30 @@ const socketHandler = (io) => {
 
             // Add to participants if not already there
             const userData = { ...user, socketId: socket.id };
-            const updatedRoom = roomStore.addParticipant(roomId, userData);
+            const { room: updatedRoom, isNew } = roomStore.addParticipant(roomId, userData);
 
             if (updatedRoom) {
-                addLog(user.id, 'Network', 'Room Joined', `Joined room: ${updatedRoom.name}`);
-
                 // Send message history to the joined user
                 socket.emit('room_messages', messageStore.getMessages(roomId));
 
-                // Create and store system message
-                const systemMsg = {
-                    id: crypto.randomUUID(),
-                    roomId,
-                    type: 'system',
-                    message: `${user.nickname} joined the room`,
-                    timestamp: Date.now()
-                };
-                messageStore.addMessage(roomId, systemMsg);
+                if (isNew) {
+                    addLog(user.id, 'Network', 'Room Joined', `Joined room: ${updatedRoom.name}`);
 
-                // Real-time update for discovery
-                io.emit('room_updated', roomStore.getRooms().find(r => r.id === roomId));
+                    // Create and store system message
+                    const systemMsg = {
+                        id: crypto.randomUUID(),
+                        roomId,
+                        type: 'system',
+                        message: `${user.nickname} joined the room`,
+                        timestamp: Date.now()
+                    };
+                    messageStore.addMessage(roomId, systemMsg);
 
-                io.to(roomId).emit('receive_message', systemMsg);
+                    // Real-time update for discovery
+                    io.emit('room_updated', roomStore.getRooms().find(r => r.id === roomId));
+
+                    io.to(roomId).emit('receive_message', systemMsg);
+                }
 
                 io.to(roomId).emit('user_joined', {
                     roomId,

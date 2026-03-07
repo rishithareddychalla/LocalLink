@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const createRoom = (req, res) => {
-    const { name, isPrivate, password, expiryTime: expiryInput, expiry, id, creatorSocketId, accentColor } = req.body;
+    const { name, isPrivate, password, expiryTime: expiryInput, expiry, id, creatorSocketId } = req.body;
 
     if (!name) {
         return res.status(400).json({ success: false, error: 'Room name is required' });
@@ -40,8 +40,7 @@ const createRoom = (req, res) => {
         creatorName: req.user.nickname,
         creatorSocketId,
         expiryTime,
-        expiryTimeout,
-        accentColor: accentColor || '#22d3ee'
+        expiryTimeout
     };
 
     try {
@@ -61,8 +60,7 @@ const createRoom = (req, res) => {
                 creatorName: room.creatorName,
                 isPrivate: room.isPrivate,
                 createdAt: room.createdAt,
-                expiresAt: room.expiresAt,
-                accentColor: room.accentColor
+                expiresAt: room.expiresAt
             }
         });
     } catch (error) {

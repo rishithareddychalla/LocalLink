@@ -50,6 +50,10 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/network', networkRoutes);
 
 // Root endpoint
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok' });
+});
+
 app.get('/', (req, res) => {
     res.json({ success: true, message: 'LocalLink In-Memory Backend API' });
 });
