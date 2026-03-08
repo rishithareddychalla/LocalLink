@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import WebRTCPeer from '../utils/webrtcManager';
+import { getUUID } from '../utils/uuid';
 import { useRoom } from './RoomContext';
 
 const WebRTCContext = createContext();
@@ -78,7 +79,7 @@ export const WebRTCProvider = ({ children }) => {
     }, []);
 
     const sendFile = useCallback(async (file, metadata) => {
-        const fileId = metadata.id || crypto.randomUUID();
+        const fileId = metadata.id || getUUID();
         const CHUNK_SIZE = 16384; // 16KB chunks
         const reader = new FileReader();
 

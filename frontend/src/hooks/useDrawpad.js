@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRoom } from '../context/RoomContext';
+import { getUUID } from '../utils/uuid';
 
 export const useDrawpad = (canvasRef) => {
     const { drawpadStrokes, addStroke, userRoomPreferences } = useRoom();
@@ -9,29 +10,7 @@ export const useDrawpad = (canvasRef) => {
     const [activeTool, setActiveTool] = useState('pencil'); // 'pencil', 'eraser'
 
     const currentStrokeRef = useRef(null);
-
-    // Initialize canvas and handle resizing
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        const resizeCanvas = () => {
-            const parent = canvas.parentElement;
-            canvas.width = parent.clientWidth;
-            canvas.height = parent.clientHeight;
-            redraw();
-        };
-
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
-
-        return () => window.removeEventListener('resize', resizeCanvas);
-    }, [canvasRef]);
-
-    // Redraw all strokes when drawpadStrokes change
-    useEffect(() => {
-        redraw();
-    }, [drawpadStrokes]);
+    const lastSyncTimeRef = useRef(0);
 
     const redraw = useCallback(() => {
         const canvas = canvasRef.current;
@@ -43,7 +22,55 @@ export const useDrawpad = (canvasRef) => {
             if (stroke.points.length < 2) return;
             drawStroke(ctx, stroke);
         });
-    }, [drawpadStrokes]);
+
+        // Draw current in-progress stroke if it exists
+        if (currentStrokeRef.current && currentStrokeRef.current.points.length > 1) {
+            drawStroke(ctx, currentStrokeRef.current);
+        }
+    }, [drawpadStrokes, canvasRef]);
+
+    // Redraw whenever strokes update
+    useEffect(() => {
+        redraw();
+    }, [drawpadStrokes, redraw]);
+
+    // Initialize canvas and handle resizing
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const resizeCanvas = () => {
+            const parent = canvas.parentElement;
+            if (!parent) return;
+
+            // Set dimensions to match parent
+            const newWidth = parent.clientWidth;
+            const newHeight = parent.clientHeight;
+
+            if (canvas.width !== newWidth || canvas.height !== newHeight) {
+                canvas.width = newWidth;
+                canvas.height = newHeight;
+                redraw();
+            }
+        };
+
+        // ResizeObserver is more reliable for component-level resizes (like tab switching)
+        const resizeObserver = new ResizeObserver(() => {
+            // Use requestAnimationFrame to avoid "ResizeObserver loop limit exceeded"
+            requestAnimationFrame(resizeCanvas);
+        });
+
+        if (canvas.parentElement) {
+            resizeObserver.observe(canvas.parentElement);
+        }
+
+        // Initial setup
+        resizeCanvas();
+
+        return () => {
+            resizeObserver.disconnect();
+        };
+    }, [canvasRef, redraw]);
 
     const drawStroke = (ctx, stroke) => {
         ctx.beginPath();
@@ -76,59 +103,85 @@ export const useDrawpad = (canvasRef) => {
 
     const startDrawing = (e) => {
         if (activeTool === 'select') return;
+
+        // Handle both mouse and touch
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
         const canvas = canvasRef.current;
         const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
 
         setIsDrawing(true);
         const color = activeTool === 'eraser' ? 'rgba(0,0,0,1)' : brushColor;
 
         currentStrokeRef.current = {
-            id: `stroke-${Date.now()}`,
+            id: `stroke-${getUUID()}`,
             userId: 'me',
             type: activeTool,
             points: [{ x, y }],
             color,
             size: activeTool === 'eraser' ? 30 : brushSize
         };
+
+        // Prevent scrolling on touch
+        if (e.touches) e.preventDefault();
     };
 
     const draw = (e) => {
         if (!isDrawing || !currentStrokeRef.current) return;
 
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        // Prevent scrolling on touch
+        if (e.cancelable && e.preventDefault) e.preventDefault();
 
-        // For live feedback of shapes, we need to clear and redraw everything
-        // But for simplicity, we just add the point. 
-        // For 'square' and 'circle', we only want two points (start and current).
-        if (currentStrokeRef.current.type === 'square' || currentStrokeRef.current.type === 'circle') {
-            currentStrokeRef.current.points = [currentStrokeRef.current.points[0], { x, y }];
-            redraw();
-            // Also draw the current (in-progress) stroke
-            drawStroke(ctx, currentStrokeRef.current);
-        } else {
-            const lastPoint = currentStrokeRef.current.points[currentStrokeRef.current.points.length - 1];
-            ctx.beginPath();
-            ctx.globalCompositeOperation = currentStrokeRef.current.type === 'eraser' ? 'destination-out' : 'source-over';
-            ctx.moveTo(lastPoint.x, lastPoint.y);
-            ctx.lineTo(x, y);
-            ctx.strokeStyle = currentStrokeRef.current.color;
-            ctx.lineWidth = currentStrokeRef.current.size;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.stroke();
-            currentStrokeRef.current.points.push({ x, y });
-            // Reset to default
-            ctx.globalCompositeOperation = 'source-over';
-        }
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d', { alpha: true });
+        const rect = canvas.getBoundingClientRect();
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+
+        // Use requestAnimationFrame for smoother performance
+        requestAnimationFrame(() => {
+            if (!isDrawing || !currentStrokeRef.current) return;
+
+            if (currentStrokeRef.current.type === 'square' || currentStrokeRef.current.type === 'circle') {
+                currentStrokeRef.current.points = [currentStrokeRef.current.points[0], { x, y }];
+                redraw();
+                drawStroke(ctx, currentStrokeRef.current);
+            } else {
+                const points = currentStrokeRef.current.points;
+                const lastPoint = points[points.length - 1];
+
+                // Add the new point
+                points.push({ x, y });
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.globalCompositeOperation = currentStrokeRef.current.type === 'eraser' ? 'destination-out' : 'source-over';
+                ctx.moveTo(lastPoint.x, lastPoint.y);
+                ctx.lineTo(x, y);
+                ctx.strokeStyle = currentStrokeRef.current.color;
+                ctx.lineWidth = currentStrokeRef.current.size;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // Incremental Sync: Send stroke updates every 50ms or every 10 points
+            const now = Date.now();
+            if (!lastSyncTimeRef.current || now - lastSyncTimeRef.current > 50) {
+                addStroke(currentStrokeRef.current);
+                lastSyncTimeRef.current = now;
+            }
+        });
     };
 
-    const stopDrawing = () => {
+    const stopDrawing = (e) => {
         if (!isDrawing || !currentStrokeRef.current) return;
         setIsDrawing(false);
 

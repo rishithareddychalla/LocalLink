@@ -85,7 +85,7 @@ export const ProfileProvider = ({ children }) => {
 
     const updateNickname = useCallback((name) => {
         setProfile(prev => {
-            const next = { ...prev, nickname: name, avatarSeed: name || crypto.randomUUID() };
+            const next = { ...prev, nickname: name, avatarSeed: name || getUUID() };
             broadcastIdentityUpdate(next);
             return next;
         });

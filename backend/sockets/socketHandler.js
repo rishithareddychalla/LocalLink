@@ -2,6 +2,7 @@ const { logs } = require('../store/memoryStore');
 const deviceStore = require('../store/deviceStore');
 const roomStore = require('../store/roomStore');
 const messageStore = require('../store/messageStore');
+const strokeStore = require('../store/strokeStore');
 const { cleanupRoom } = require('../controllers/roomController');
 const crypto = require('crypto');
 
@@ -91,6 +92,7 @@ const socketHandler = (io) => {
             if (updatedRoom) {
                 // Send message history to the joined user
                 socket.emit('room_messages', messageStore.getMessages(roomId));
+                socket.emit('room_strokes', strokeStore.getStrokes(roomId));
 
                 if (isNew) {
                     addLog(user.id, 'Network', 'Room Joined', `Joined room: ${updatedRoom.name}`);
@@ -147,6 +149,7 @@ const socketHandler = (io) => {
                 }
 
                 // Cleanup room from backend
+                strokeStore.clearStrokes(roomId);
                 cleanupRoom(roomId, io, true);
                 return;
             }
@@ -182,9 +185,9 @@ const socketHandler = (io) => {
             console.log(`User ${userId} left room ${roomId}`);
         });
 
-        socket.on('send_message', ({ roomId, userId, nickname, avatar, message }) => {
+        socket.on('send_message', ({ id, roomId, userId, nickname, avatar, message }) => {
             const newMessage = {
-                id: crypto.randomUUID(),
+                id: id || crypto.randomUUID(),
                 roomId,
                 userId,
                 nickname,
@@ -201,6 +204,7 @@ const socketHandler = (io) => {
         });
 
         socket.on('send_stroke', ({ roomId, stroke }) => {
+            strokeStore.addStroke(roomId, stroke);
             io.to(roomId).emit('receive_stroke', { roomId, stroke });
         });
 
@@ -261,6 +265,7 @@ const socketHandler = (io) => {
                         s.leave(room.id);
                     }
 
+                    strokeStore.clearStrokes(room.id);
                     cleanupRoom(room.id, io, true);
                 }
             }

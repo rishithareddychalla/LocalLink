@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { createRoomAPI, joinRoomAPI, leaveRoomAPI } from '../services/roomService';
-import { useProfile } from './ProfileContext';
+import { getUUID } from '../utils/uuid';
 import { useNetworkLog } from './NetworkLogContext';
 import {
     getPreferences,
@@ -14,6 +14,7 @@ import {
 import { generateUniqueRoomId } from '../utils/generateRoomId';
 import { useFiles } from './FileContext';
 import { useNotifications } from './NotificationContext';
+import { useProfile } from './ProfileContext';
 
 import { useWebRTC } from './WebRTCContext';
 
@@ -48,69 +49,102 @@ export const RoomProvider = ({ children }) => {
         setGeneratedId(generateUniqueRoomId(roomRegistry));
     }, [roomRegistry]);
 
+    // Unified Upsert Helpers
+    const upsertMessage = useCallback((message) => {
+        setChatMessages(prev => {
+            const index = prev.findIndex(m => m.id === message.id);
+            if (index !== -1) {
+                // Bail out if no change (avoid redundant updates from P2P/Socket duplicates)
+                if (prev[index].message === message.message) return prev;
+
+                const next = [...prev];
+                next[index] = { ...next[index], ...message };
+                return next;
+            }
+            return [...prev, message];
+        });
+    }, []);
+
+    const upsertStroke = useCallback((stroke) => {
+        setDrawpadStrokes(prev => {
+            const index = prev.findIndex(s => s.id === stroke.id);
+            if (index !== -1) {
+                // Bail out if no change (avoid redundant updates from P2P/Socket duplicates)
+                // Using points length as a quick proxy for stroke updates
+                if (prev[index].points.length === stroke.points.length && prev[index].type === stroke.type) {
+                    return prev;
+                }
+
+                const next = [...prev];
+                next[index] = { ...stroke, points: [...stroke.points] };
+                return next;
+            }
+            return [...prev, { ...stroke, points: [...stroke.points] }];
+        });
+    }, []);
+
     // Listen for P2P Data
     useEffect(() => {
         const handleP2PData = (event) => {
             const { from, data } = event.detail;
             if (data.type === 'chat') {
-                setChatMessages(prev => [...prev, data.payload]);
+                upsertMessage(data.payload);
             } else if (data.type === 'whiteboard') {
-                setDrawpadStrokes(prev => [...prev, data.payload]);
+                upsertStroke(data.payload);
             }
         };
 
         window.addEventListener('webrtc_data', handleP2PData);
         return () => window.removeEventListener('webrtc_data', handleP2PData);
-    }, []);
+    }, [upsertMessage, upsertStroke]);
 
     const sendMessage = useCallback((text) => {
         if (!activeRoom || !text.trim()) return;
 
         const messageData = {
-            id: crypto.randomUUID(),
+            id: getUUID(),
             roomId: activeRoom.id,
             userId: profile.id,
             nickname: profile.nickname,
             avatar: profile.avatar,
             message: text,
             timestamp: Date.now(),
-            p2p: true // Mark as P2P
+            p2p: true
         };
 
-        // Try P2P first
-        const sentP2P = sendP2P ? sendP2P({ type: 'chat', payload: messageData }) : false;
+        // Dual-Delivery: Send via P2P for speed AND Socket for history/fallback
+        if (sendP2P) sendP2P({ type: 'chat', payload: messageData });
 
-        if (sentP2P) {
-            setChatMessages(prev => [...prev, messageData]);
-            console.log('[WebRTC] Message sent via P2P');
-        } else {
-            console.log('[WebRTC] P2P failed, falling back to Socket');
-            if (socketRef.current) {
-                socketRef.current.emit('send_message', {
-                    roomId: activeRoom.id,
-                    userId: profile.id,
-                    nickname: profile.nickname,
-                    avatar: profile.avatar,
-                    message: text
-                });
-            }
+        if (socketRef.current) {
+            socketRef.current.emit('send_message', {
+                ...messageData,
+                p2p: false // Mark as non-P2P when sent to server
+            });
         }
-    }, [activeRoom, profile, sendP2P]);
+
+        // Local Update
+        upsertMessage(messageData);
+    }, [activeRoom, profile, sendP2P, upsertMessage]);
 
     const addStroke = useCallback((stroke) => {
         if (!activeRoom) return;
-        setDrawpadStrokes(prev => [...prev, stroke]);
 
-        // Try P2P first
-        const sentP2P = sendP2P ? sendP2P({ type: 'whiteboard', payload: stroke }) : false;
+        // Clone to decouple from active drawing reference
+        const strokeClone = { ...stroke, points: [...stroke.points] };
 
-        if (!sentP2P && socketRef.current) {
+        // Dual-Delivery: P2P (Speed) + Socket (History)
+        if (sendP2P) sendP2P({ type: 'whiteboard', payload: strokeClone });
+
+        if (socketRef.current) {
             socketRef.current.emit('send_stroke', {
                 roomId: activeRoom.id,
-                stroke
+                stroke: strokeClone
             });
         }
-    }, [activeRoom, sendP2P]);
+
+        // Local Update
+        upsertStroke(strokeClone);
+    }, [activeRoom, sendP2P, upsertStroke]);
 
     const leaveRoom = useCallback(async (reason) => {
         if (!activeRoom) return;
@@ -146,7 +180,7 @@ export const RoomProvider = ({ children }) => {
 
             if (timerRef.current) clearInterval(timerRef.current);
             await leaveRoomAPI(activeRoom.id);
-            addLogEvent("Activity", "Room Left", `Left ${activeRoom.name}`);
+            addLogEvent("Activity", "Room Left", `Left ${activeRoom.name} `);
         } catch (error) {
             console.error('Leave room error:', error);
         }
@@ -218,7 +252,7 @@ export const RoomProvider = ({ children }) => {
         });
 
         socket.on('receive_message', (message) => {
-            setChatMessages(prev => [...prev, message]);
+            upsertMessage(message);
         });
 
         socket.on('typing_update', ({ userId, nickname, isTyping }) => {
@@ -245,8 +279,12 @@ export const RoomProvider = ({ children }) => {
             addLogEvent("Network", "Room Closed", message);
         });
 
+        socket.on('room_strokes', (strokes) => {
+            setDrawpadStrokes(strokes);
+        });
+
         socket.on('receive_stroke', ({ stroke }) => {
-            setDrawpadStrokes(prev => [...prev, stroke]);
+            upsertStroke(stroke);
         });
 
         socket.on('file_uploaded', (file) => {
@@ -257,7 +295,7 @@ export const RoomProvider = ({ children }) => {
                 addNotification({
                     type: "upload",
                     title: "New File Shared",
-                    message: `${file.uploadedBy === profile.id ? 'You' : file.uploadedBy} uploaded ${file.name}`,
+                    message: `${file.uploadedBy === profile.id ? 'You' : file.uploadedBy} uploaded ${file.name} `,
                     fileName: file.name,
                     timestamp: Date.now()
                 });

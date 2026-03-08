@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { getUserFiles, addFileToHistory } from '../utils/filePersistence';
 import { scanFileBeforeDownload } from '../utils/securityScan';
+import { getUUID } from '../utils/uuid';
 import { useNotifications } from './NotificationContext';
 import { useNetworkLog } from './NetworkLogContext';
 import { useProfile } from './ProfileContext';
@@ -78,7 +79,7 @@ export const FileProvider = ({ children }) => {
 
     const uploadFile = async (roomId, file) => {
         const metadata = {
-            id: crypto.randomUUID(),
+            id: getUUID(),
             name: file.name,
             size: file.size,
             type: file.type,

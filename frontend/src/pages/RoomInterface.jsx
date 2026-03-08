@@ -255,11 +255,11 @@ const RoomInterface = () => {
                                         href={file.downloadUrl}
                                         download={file.name}
                                         onClick={() => activeRoom && trackDownload(activeRoom.id, file)}
-                                        className="p-1.5 hover:bg-text/5 rounded-md text-text-main-muted transition-colors"
+                                        className="w-11 h-11 flex items-center justify-center hover:bg-text/5 rounded-xl text-text-main-muted transition-colors shrink-0"
                                         onMouseEnter={(e) => e.currentTarget.style.color = activeTheme}
                                         onMouseLeave={(e) => e.currentTarget.style.color = ''}
                                     >
-                                        <Download size={14} />
+                                        <Download size={18} />
                                     </a>
                                 ) : (
                                     <div className="p-1.5 flex items-center justify-center">
@@ -304,8 +304,8 @@ const RoomInterface = () => {
 
 
 
-                    <button className="w-10 h-10 rounded-full bg-text/[0.03] hover:bg-text/[0.08] text-text-main flex items-center justify-center shrink-0 border border-border transition-all">
-                        <UsersIcon size={14} style={{ color: activeTheme }} />
+                    <button className="w-11 h-11 rounded-full bg-text/[0.03] hover:bg-text/[0.08] text-text-main flex items-center justify-center shrink-0 border border-border transition-all">
+                        <UsersIcon size={18} style={{ color: activeTheme }} />
                     </button>
                 </div>
             </div>
@@ -313,7 +313,7 @@ const RoomInterface = () => {
     );
 
     return (
-        <div className="flex flex-col h-[calc(100vh-120px)] lg:h-[calc(100vh-160px)] bg-background overflow-hidden pb-4">
+        <div className="flex flex-col h-[calc(100vh-16px)] lg:h-[calc(100vh-80px)] bg-background overflow-hidden pb-safe">
             {/* Header */}
             <header className="flex flex-col sm:flex-row items-center justify-between mb-4 md:mb-6 gap-4 shrink-0">
                 <div className="flex items-center gap-4 w-full sm:w-auto">
@@ -350,11 +350,11 @@ const RoomInterface = () => {
                     <div className="relative" ref={notificationRef}>
                         <button
                             onClick={() => setShowNotifications(!showNotifications)}
-                            className="w-10 h-10 rounded-full bg-text/[0.03] hover:bg-text/[0.08] text-text-main flex items-center justify-center shrink-0 border border-border transition-all relative"
+                            className="w-11 h-11 rounded-full bg-text/[0.03] hover:bg-text/[0.08] text-text-main flex items-center justify-center shrink-0 border border-border transition-all relative"
                         >
-                            <Bell size={16} style={{ color: activeTheme }} />
+                            <Bell size={18} style={{ color: activeTheme }} />
                             {unreadCount > 0 && (
-                                <span className="absolute top-2 right-2.5 w-1.5 h-1.5 rounded-full animate-pulse"
+                                <span className="absolute top-2.5 right-3 w-2 h-2 rounded-full animate-pulse"
                                     style={{ backgroundColor: activeTheme }}
                                 />
                             )}
@@ -410,9 +410,9 @@ const RoomInterface = () => {
                             await leaveRoom();
                             navigate('/rooms');
                         }}
-                        className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 border border-red-500/20"
+                        className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all active:scale-95 border border-red-500/20 shadow-sm"
                     >
-                        <LogOut size={14} className="inline mr-2" />
+                        <LogOut size={16} className="inline mr-2" />
                         <span className="hidden xs:inline">Leave</span>
                     </button>
                 </div>
@@ -585,10 +585,10 @@ const RoomInterface = () => {
                                             handleSendMessage();
                                             setTyping(false);
                                         }}
-                                        className="absolute right-6 top-1/2 -translate-y-1/2 w-8 h-8 text-black rounded-full flex items-center justify-center hover:opacity-90 active:scale-90 transition-all font-bold"
+                                        className="absolute right-6 top-1/2 -translate-y-1/2 w-11 h-11 text-black rounded-full flex items-center justify-center hover:opacity-90 active:scale-90 transition-all font-bold shadow-lg"
                                         style={{ backgroundColor: activeTheme }}
                                     >
-                                        <Send size={14} className="stroke-[3]" />
+                                        <Send size={18} className="stroke-[3]" />
                                     </button>
                                 </div>
                             </div>
@@ -614,7 +614,10 @@ const RoomInterface = () => {
                                 onMouseMove={draw}
                                 onMouseUp={stopDrawing}
                                 onMouseLeave={stopDrawing}
-                                className="absolute inset-0 w-full h-full cursor-crosshair z-10"
+                                onTouchStart={startDrawing}
+                                onTouchMove={draw}
+                                onTouchEnd={stopDrawing}
+                                className="absolute inset-0 w-full h-full cursor-crosshair z-10 touch-none"
                             />
 
                             <div className="text-center relative z-0 p-6 pointer-events-none opacity-20">
@@ -627,57 +630,57 @@ const RoomInterface = () => {
                             </div>
 
                             {/* Tools - Adjusted for mobile */}
-                            <div className="absolute top-4 md:top-6 left-1/2 -translate-x-1/2 flex items-center gap-1.5 md:gap-2 bg-surface/80 backdrop-blur-xl border border-border p-1.5 rounded-2xl shadow-2xl z-20 max-w-[90vw] overflow-x-auto no-scrollbar">
+                            <div className="absolute top-4 md:top-6 left-1/2 -translate-x-1/2 flex items-center gap-1.5 md:gap-2 bg-surface/90 backdrop-blur-2xl border border-border p-2 rounded-2xl shadow-2xl z-20 max-w-[95vw] overflow-x-auto no-scrollbar">
                                 <button
                                     onClick={() => setActiveTool('select')}
                                     className={cn(
-                                        "w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-xl flex items-center justify-center transition-all",
+                                        "w-11 h-11 md:w-10 md:h-10 shrink-0 rounded-xl flex items-center justify-center transition-all",
                                         activeTool === 'select' ? "" : "text-text-main-muted/30 hover:bg-text/5"
                                     )}
                                     style={activeTool === 'select' ? { backgroundColor: `${activeTheme}10`, color: activeTheme } : {}}
                                 >
-                                    <MousePointer2 size={16} />
+                                    <MousePointer2 size={18} />
                                 </button>
                                 <button
                                     onClick={() => setActiveTool('pencil')}
                                     className={cn(
-                                        "w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-xl flex items-center justify-center transition-all",
+                                        "w-11 h-11 md:w-10 md:h-10 shrink-0 rounded-xl flex items-center justify-center transition-all",
                                         activeTool === 'pencil' ? "text-text-main" : "text-text-main-muted/30 hover:bg-text/5"
                                     )}
                                     style={activeTool === 'pencil' ? { color: activeTheme, backgroundColor: `${activeTheme}10` } : {}}
                                 >
-                                    <Pencil size={16} />
+                                    <Pencil size={18} />
                                 </button>
                                 <button
                                     onClick={() => setActiveTool('square')}
                                     className={cn(
-                                        "w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-xl flex items-center justify-center transition-all",
+                                        "w-11 h-11 md:w-10 md:h-10 shrink-0 rounded-xl flex items-center justify-center transition-all",
                                         activeTool === 'square' ? "text-text-main" : "text-text-main-muted/30 hover:bg-text/5"
                                     )}
                                     style={activeTool === 'square' ? { color: activeTheme, backgroundColor: `${activeTheme}10` } : {}}
                                 >
-                                    <Square size={14} />
+                                    <Square size={16} />
                                 </button>
                                 <button
                                     onClick={() => setActiveTool('circle')}
                                     className={cn(
-                                        "w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-xl flex items-center justify-center transition-all",
+                                        "w-11 h-11 md:w-10 md:h-10 shrink-0 rounded-xl flex items-center justify-center transition-all",
                                         activeTool === 'circle' ? "text-text-main" : "text-text-main-muted/30 hover:bg-text/5"
                                     )}
                                     style={activeTool === 'circle' ? { color: activeTheme, backgroundColor: `${activeTheme}10` } : {}}
                                 >
-                                    <Circle size={16} />
+                                    <Circle size={18} />
                                 </button>
-                                <div className="h-6 w-px bg-border/50 mx-0.5" />
+                                <div className="h-6 w-px bg-border/50 mx-1" />
                                 <button
                                     onClick={() => setActiveTool('eraser')}
                                     className={cn(
-                                        "w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-xl flex items-center justify-center transition-all",
+                                        "w-11 h-11 md:w-10 md:h-10 shrink-0 rounded-xl flex items-center justify-center transition-all",
                                         activeTool === 'eraser' ? "text-text-main" : "text-text-main-muted/30 hover:bg-text/5"
                                     )}
                                     style={activeTool === 'eraser' ? { color: activeTheme, backgroundColor: `${activeTheme}10` } : {}}
                                 >
-                                    <Eraser size={16} className="transform -rotate-45" />
+                                    <Eraser size={18} className="transform -rotate-45" />
                                 </button>
                                 <button
                                     onClick={() => {
@@ -689,9 +692,9 @@ const RoomInterface = () => {
                                             link.click();
                                         }
                                     }}
-                                    className="w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-xl hover:bg-text/5 flex items-center justify-center text-text-main-muted/30 transition-all"
+                                    className="w-11 h-11 md:w-10 md:h-10 shrink-0 rounded-xl hover:bg-text/5 flex items-center justify-center text-text-main-muted/30 transition-all"
                                 >
-                                    <Download size={16} />
+                                    <Download size={18} />
                                 </button>
                             </div>
 
