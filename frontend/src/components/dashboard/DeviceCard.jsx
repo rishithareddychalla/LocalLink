@@ -39,19 +39,8 @@ const DeviceCard = ({ device }) => {
                 )} />
             </div>
 
-            <h3 className="text-sm md:text-base font-bold text-text-main mb-1 group-hover:text-primary transition-colors">{device.name}</h3>
-            <p className="text-[10px] md:text-xs text-text-main-muted mb-1 font-medium uppercase tracking-tight">{device.ip}</p>
-            <p className="text-[9px] text-text-main-muted/50 mb-6 font-medium uppercase">{device.lastSeen}</p>
-
-            <div className="flex items-center gap-4 mt-auto w-full justify-center">
-                <button className="text-[10px] font-bold text-primary uppercase tracking-widest hover:opacity-80 transition-opacity">
-                    Details
-                </button>
-                <div className="w-1 h-1 rounded-full bg-text/10" />
-                <button className="text-[10px] font-bold text-text-main-muted hover:text-text-main uppercase tracking-widest transition-colors">
-                    Block
-                </button>
-            </div>
+            <h3 className="text-sm md:text-base font-bold text-text-main mt-4 group-hover:text-primary transition-colors">{device.name}</h3>
+            <p className="text-[10px] md:text-xs text-text-main-muted mb-4 font-medium uppercase tracking-tight">{device.ip}</p>
         </div>
     );
 };

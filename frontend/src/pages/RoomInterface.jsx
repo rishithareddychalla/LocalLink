@@ -39,6 +39,7 @@ import { useFiles } from '../context/FileContext';
 import { useNotifications } from '../context/NotificationContext';
 import { useProfile } from '../context/ProfileContext';
 import { useNetworkLog } from '../context/NetworkLogContext';
+import { useWebRTC } from '../context/WebRTCContext';
 import { useNavigate } from 'react-router-dom';
 import { useDrawpad } from '../hooks/useDrawpad';
 import { useClickOutside } from '../hooks/useClickOutside';
@@ -67,6 +68,8 @@ const RoomInterface = () => {
         setTyping,
         setRoomClosureReason
     } = useRoom();
+
+    const { peers } = useWebRTC() || { peers: {} };
 
     const { trackDownload, isBlocked } = useFiles();
     const { profile } = useProfile();
@@ -244,7 +247,7 @@ const RoomInterface = () => {
                                         )}
                                     </div>
                                     <p className="text-[9px] text-text-main-muted font-bold uppercase">
-                                        {(file.size / 1024 / 1024).toFixed(1)} MB • {file.uploadedBy === profile.id ? 'Local' : 'Peer'}
+                                        {(file.size / 1024 / 1024).toFixed(1)} MB • {file.isP2P ? 'Direct P2P' : (file.uploadedBy === profile.id ? 'Local' : 'Server')}
                                     </p>
                                 </div>
                                 {file.isSafe && file.downloadUrl !== '#' ? (
@@ -288,8 +291,12 @@ const RoomInterface = () => {
                                     <img src={p.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${p.nickname || p.name}`} alt={p.nickname || p.name} className="w-full h-full object-cover" />
                                 </div>
                                 <div className={cn(
-                                    "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface bg-green-500"
+                                    "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface",
+                                    peers[p.socketId] === 'connected' ? "bg-green-500" : "bg-text/20"
                                 )} />
+                                {peers[p.socketId] === 'connected' && (
+                                    <div className="absolute -top-1 -right-1 bg-primary text-background text-[6px] font-black px-1 rounded-full animate-bounce">P2P</div>
+                                )}
                             </div>
                             <span className="text-[10px] font-bold text-text-main-muted group-hover:text-text-main transition-colors truncate max-w-[64px] text-center">{p.nickname || p.name}</span>
                         </div>
@@ -494,6 +501,9 @@ const RoomInterface = () => {
                                                 <div className={cn("flex flex-col max-w-[75%]", isMe ? "items-end" : "items-start")}>
                                                     <div className="flex items-center gap-1.5 mb-1 awareness-indicator">
                                                         <span className="text-[10px] font-bold text-text-main">{chat.nickname}</span>
+                                                        {chat.p2p && (
+                                                            <span className="text-[8px] font-black text-primary px-1 rounded border border-primary/30">P2P</span>
+                                                        )}
                                                         <span className="text-[8px] font-medium text-text-main-muted/50">
                                                             {chat.timestamp ? new Date(chat.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                                                         </span>

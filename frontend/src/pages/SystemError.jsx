@@ -34,7 +34,9 @@ const SystemError = ({ title: propTitle, message: propMessage, errorCode: propEr
             <header className="absolute top-0 left-0 w-full p-8 flex justify-between items-center z-20">
                 <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full bg-[#00f0ff]/20 flex items-center justify-center">
-                        <div className="w-4 h-4 rounded-full border-2 border-[#00f0ff] animate-pulse" />
+                        <span className="material-symbols-outlined text-background font-bold text-xl">
+                            radar
+                        </span>
                     </div>
                     <span className="text-xl font-black text-white tracking-tighter">LocalLink Radar</span>
                 </div>
@@ -68,9 +70,9 @@ const SystemError = ({ title: propTitle, message: propMessage, errorCode: propEr
                     <div className="w-24 h-24 rounded-full border border-red-500/30 bg-[#ef4444]/5 flex items-center justify-center">
                         <CircleAlert size={48} className="text-red-500" />
                     </div>
-                    <div className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg border-2 border-[#0f172a]">
+                    {/* <div className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg border-2 border-[#0f172a]">
                         500
-                    </div>
+                    </div> */}
                 </div>
 
                 <h1 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight">
@@ -128,14 +130,14 @@ const SystemError = ({ title: propTitle, message: propMessage, errorCode: propEr
                     </button>
                 </div>
 
-                <button className="mt-8 text-[11px] font-bold text-[#00f0ff]/60 hover:text-[#00f0ff] uppercase tracking-widest transition-colors">
+                {/* <button className="mt-8 text-[11px] font-bold text-[#00f0ff]/60 hover:text-[#00f0ff] uppercase tracking-widest transition-colors">
                     If this persists, check our status page &rarr;
-                </button>
+                </button> */}
             </motion.div>
 
             {/* Footer */}
             <footer className="absolute bottom-0 w-full p-10 flex flex-col items-center gap-6 z-10">
-                <div className="flex items-center gap-12 text-[10px] font-black uppercase tracking-[0.2em]">
+                {/* <div className="flex items-center gap-12 text-[10px] font-black uppercase tracking-[0.2em]">
                     <div className="flex items-center gap-2 text-slate-500">
                         <Globe size={14} className="text-slate-400" />
                         Global Nodes: <span className="text-[#27c93f]">Online</span>
@@ -144,7 +146,7 @@ const SystemError = ({ title: propTitle, message: propMessage, errorCode: propEr
                         <Wifi size={14} className="text-red-500/60" />
                         Local Radar: <span className="text-red-500">Offline</span>
                     </div>
-                </div>
+                </div> */}
                 <p className="text-[10px] text-slate-700 font-bold uppercase tracking-widest">
                     &copy; 2026 LocalLink Technologies. All systems logged.
                 </p>

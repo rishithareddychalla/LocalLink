@@ -15,6 +15,8 @@ import { generateUniqueRoomId } from '../utils/generateRoomId';
 import { useFiles } from './FileContext';
 import { useNotifications } from './NotificationContext';
 
+import { useWebRTC } from './WebRTCContext';
+
 
 const RoomContext = createContext();
 
@@ -31,43 +33,84 @@ export const RoomProvider = ({ children }) => {
     const [roomClosureReason, setRoomClosureReason] = useState(null);
     const [localRoomTheme, setLocalRoomTheme] = useState('#22d3ee');
     const [typingParticipants, setTypingParticipants] = useState({}); // { userId: nickname }
+    const [chatMessages, setChatMessages] = useState([]);
+
+    const { sendP2P } = useWebRTC() || {};
+    const { addRoomFile, revokeRoomFiles, roomFilesMap } = useFiles();
+    const { profile } = useProfile();
+    const { addLogEvent } = useNetworkLog();
+    const { addNotification } = useNotifications();
+
+    const socketRef = useRef(null);
+    const timerRef = useRef(null);
 
     useEffect(() => {
         setGeneratedId(generateUniqueRoomId(roomRegistry));
     }, [roomRegistry]);
 
-    const { addRoomFile, revokeRoomFiles, roomFilesMap } = useFiles();
+    // Listen for P2P Data
+    useEffect(() => {
+        const handleP2PData = (event) => {
+            const { from, data } = event.detail;
+            if (data.type === 'chat') {
+                setChatMessages(prev => [...prev, data.payload]);
+            } else if (data.type === 'whiteboard') {
+                setDrawpadStrokes(prev => [...prev, data.payload]);
+            }
+        };
 
-    const socketRef = useRef(null);
-    const timerRef = useRef(null);
-
-    const { profile } = useProfile();
-    const { addLogEvent } = useNetworkLog();
-    const { addNotification } = useNotifications();
-
-    const [chatMessages, setChatMessages] = useState([]);
+        window.addEventListener('webrtc_data', handleP2PData);
+        return () => window.removeEventListener('webrtc_data', handleP2PData);
+    }, []);
 
     const sendMessage = useCallback((text) => {
         if (!activeRoom || !text.trim()) return;
 
         const messageData = {
+            id: crypto.randomUUID(),
             roomId: activeRoom.id,
             userId: profile.id,
             nickname: profile.nickname,
             avatar: profile.avatar,
-            message: text
+            message: text,
+            timestamp: Date.now(),
+            p2p: true // Mark as P2P
         };
 
-        if (socketRef.current) {
-            socketRef.current.emit('send_message', {
+        // Try P2P first
+        const sentP2P = sendP2P ? sendP2P({ type: 'chat', payload: messageData }) : false;
+
+        if (sentP2P) {
+            setChatMessages(prev => [...prev, messageData]);
+            console.log('[WebRTC] Message sent via P2P');
+        } else {
+            console.log('[WebRTC] P2P failed, falling back to Socket');
+            if (socketRef.current) {
+                socketRef.current.emit('send_message', {
+                    roomId: activeRoom.id,
+                    userId: profile.id,
+                    nickname: profile.nickname,
+                    avatar: profile.avatar,
+                    message: text
+                });
+            }
+        }
+    }, [activeRoom, profile, sendP2P]);
+
+    const addStroke = useCallback((stroke) => {
+        if (!activeRoom) return;
+        setDrawpadStrokes(prev => [...prev, stroke]);
+
+        // Try P2P first
+        const sentP2P = sendP2P ? sendP2P({ type: 'whiteboard', payload: stroke }) : false;
+
+        if (!sentP2P && socketRef.current) {
+            socketRef.current.emit('send_stroke', {
                 roomId: activeRoom.id,
-                userId: profile.id,
-                nickname: profile.nickname,
-                avatar: profile.avatar,
-                message: text
+                stroke
             });
         }
-    }, [activeRoom, profile]);
+    }, [activeRoom, sendP2P]);
 
     const leaveRoom = useCallback(async (reason) => {
         if (!activeRoom) return;
@@ -355,16 +398,6 @@ export const RoomProvider = ({ children }) => {
         savePreferences(updated);
     };
 
-    const addStroke = useCallback((stroke) => {
-        if (!activeRoom) return;
-        setDrawpadStrokes(prev => [...prev, stroke]);
-        if (socketRef.current) {
-            socketRef.current.emit('send_stroke', {
-                roomId: activeRoom.id,
-                stroke
-            });
-        }
-    }, [activeRoom]);
 
     const refreshGeneratedId = useCallback(() => {
         setGeneratedId(generateUniqueRoomId(roomRegistry));
@@ -406,7 +439,9 @@ export const RoomProvider = ({ children }) => {
             sendMessage,
             updatePreferences,
             refreshGeneratedId,
-            addStroke
+            addStroke,
+            socketRef,
+            profile
         }}>
             {children}
         </RoomContext.Provider>

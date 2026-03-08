@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { io } from 'socket.io-client';
 import { useProfile } from '../context/ProfileContext';
+import { apiRequest } from '../services/api';
+
+const SOCKET_URL = window.location.origin.replace('5173', '5000');
 
 const useNetwork = () => {
     const { profile } = useProfile();
@@ -7,27 +11,16 @@ const useNetwork = () => {
     const [subnet, setSubnet] = useState('');
     const [connectionStatus, setConnectionStatus] = useState('connecting');
     const [activeDevices, setActiveDevices] = useState([]);
-    const [scannedDevices, setScannedDevices] = useState([]);
     const [isScanning, setIsScanning] = useState(false);
-    const pollingTimerRef = useRef(null);
 
-    // Merge active and scanned devices
+    // Unified devices list (including ourselves)
     const devices = useMemo(() => {
-        const merged = [...activeDevices];
-
-        // Add scanned devices that aren't already in activeDevices (by IP)
-        scannedDevices.forEach(scanned => {
-            const alreadyExists = merged.find(d => d.ip === scanned.ip);
-            if (!alreadyExists) {
-                merged.push(scanned);
-            }
-        });
-
-        // Filter out ourselves if we appear in the lists
-        const filtered = merged.filter(d =>
-            d.ip !== lanIp &&
-            d.name !== (profile.nickname || 'Ghost_User') + ' (You)'
+        // Filter out ourselves if we appear in the list (mDNS might broadcast us)
+        const others = activeDevices.filter(d =>
+            !d.name.includes('(You)')
         );
+
+        const filtered = [...others];
 
         // Add "My Device" at the top
         if (!profile.ghostMode) {
@@ -44,18 +37,18 @@ const useNetwork = () => {
         }
 
         return filtered;
-    }, [activeDevices, scannedDevices, profile, lanIp]);
+    }, [activeDevices, profile, lanIp]);
 
     const fetchDevices = useCallback(async (showLoading = false) => {
         if (showLoading) setIsScanning(true);
 
         try {
-            const response = await fetch(`http://${window.location.hostname}:5000/api/network/devices`);
-            if (response.ok) {
-                const data = await response.json();
-                setLanIp(data.localIp || '');
-                setSubnet(data.subnetPrefix || '');
-                setActiveDevices(data.devices || []);
+            const response = await apiRequest('/network/devices');
+            if (response.success) {
+                setLanIp(response.localIp || '');
+                window.llr_lan_ip = response.localIp || ''; // Sync for context
+                setSubnet(response.subnetPrefix || '');
+                setActiveDevices(response.devices || []);
                 setConnectionStatus('connected');
             }
         } catch (error) {
@@ -66,34 +59,76 @@ const useNetwork = () => {
         }
     }, []);
 
+    // Initial fetch and poll
     useEffect(() => {
         fetchDevices(true);
-        pollingTimerRef.current = setInterval(() => {
-            fetchDevices(false);
-        }, 5000);
-
-        return () => {
-            if (pollingTimerRef.current) clearInterval(pollingTimerRef.current);
-        };
+        const timer = setInterval(() => fetchDevices(false), 10000);
+        return () => clearInterval(timer);
     }, [fetchDevices]);
 
-    const scanSubnet = async () => {
-        if (isScanning) return;
-        setIsScanning(true);
+    // Socket.io for real-time discovery updates
+    useEffect(() => {
+        const socket = io(SOCKET_URL, {
+            transports: ['websocket', 'polling']
+        });
 
-        try {
-            const response = await fetch(`http://${window.location.hostname}:5000/api/network/scan`);
-            if (response.ok) {
-                const data = await response.json();
-                setScannedDevices(data.devices || []);
-                setLanIp(data.localIp || '');
-                setSubnet(data.subnetPrefix || '');
-            }
-        } catch (error) {
-            console.error("Error during active LAN scan:", error);
-        } finally {
-            setIsScanning(false);
-        }
+        socket.on('device_discovered', (device) => {
+            setActiveDevices(prev => {
+                // Ignore self
+                if (device.ip === lanIp && lanIp !== '') return prev;
+
+                const existingIndex = prev.findIndex(d => d.id === device.id || d.ip === device.ip);
+                if (existingIndex >= 0) {
+                    const updated = [...prev];
+                    updated[existingIndex] = { ...updated[existingIndex], ...device };
+                    return updated;
+                }
+                return [...prev, device];
+            });
+        });
+
+        socket.on('device_removed', (deviceId) => {
+            setActiveDevices(prev => prev.filter(d => d.id !== deviceId));
+        });
+
+        // Socket Client Events (Logged in devices)
+        socket.on('device_joined', (deviceData) => {
+            if (deviceData.ipAddress === '127.0.0.1' || (deviceData.ipAddress === lanIp && lanIp !== '')) return;
+
+            const device = {
+                id: deviceData.id,
+                name: deviceData.nickname || 'Anonymous Device',
+                ip: deviceData.ipAddress,
+                avatar: deviceData.avatar,
+                status: deviceData.status || 'online',
+                lastSeen: 'Just now',
+                type: 'client',
+                discoveryMethod: 'Socket'
+            };
+
+            setActiveDevices(prev => {
+                const existingIndex = prev.findIndex(d => d.id === device.id || d.ip === device.ip);
+                if (existingIndex >= 0) {
+                    const updated = [...prev];
+                    updated[existingIndex] = { ...updated[existingIndex], ...device };
+                    return updated;
+                }
+                return [...prev, device];
+            });
+        });
+
+        socket.on('device_left', (deviceId) => {
+            setActiveDevices(prev => prev.filter(d => d.id !== deviceId));
+        });
+
+        return () => socket.disconnect();
+    }, []);
+
+    // Dummy scan function for backward compatibility
+    const scanSubnet = async () => {
+        setIsScanning(true);
+        await fetchDevices(false);
+        setTimeout(() => setIsScanning(false), 1500);
     };
 
     return {

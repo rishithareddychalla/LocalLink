@@ -23,6 +23,7 @@ import { useRoom } from '../context/RoomContext';
 import { useProfile } from '../context/ProfileContext';
 import { useSettings } from '../context/SettingsContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useNetworkLog } from '../context/NetworkLogContext';
 import RoomInterface from './RoomInterface';
 import useRooms from '../hooks/useRooms';
 
@@ -46,6 +47,7 @@ const Rooms = () => {
     const { profile } = useProfile();
     const { settings } = useSettings();
     const { addNotification } = useNotifications();
+    const { lanDevices } = useNetworkLog();
 
     // Create Room State
     const [roomName, setRoomName] = useState('');
@@ -406,12 +408,12 @@ const Rooms = () => {
                                     onChange={(e) => setSearchTermNearby(e.target.value)}
                                     className="w-full bg-background border border-border rounded-xl py-2.5 pl-10 pr-4 text-[10px] font-bold tracking-[0.2em] text-text-main placeholder:text-text-main-muted focus:outline-none transition-all uppercase"
                                     onFocus={(e) => {
-                                        e.target.style.borderColor = 'var(--color-primary)';
-                                        e.target.previousSibling.style.color = 'var(--color-primary)';
+                                        e.target.style.borderColor = settings.accentColor;
+                                        if (e.target.previousSibling) e.target.previousSibling.style.color = settings.accentColor;
                                     }}
                                     onBlur={(e) => {
                                         e.target.style.borderColor = 'var(--border-color)';
-                                        e.target.previousSibling.style.color = 'var(--text-secondary)';
+                                        if (e.target.previousSibling) e.target.previousSibling.style.color = 'var(--text-secondary)';
                                     }}
                                 />
                             </div>
@@ -424,7 +426,35 @@ const Rooms = () => {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {filteredNearbyRooms.length === 0 ? (
+                        {/* LAN Discovered Devices */}
+                        {lanDevices.map((device) => (
+                            <div key={device.id} className="bg-surface border border-border rounded-2xl p-5 hover:border-primary/20 transition-all group flex flex-col gap-4 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -translate-y-12 translate-x-12 blur-2xl" />
+
+                                <div className="flex items-start justify-between relative z-10">
+                                    <div className="truncate pr-2">
+                                        <div className="flex items-center gap-2">
+                                            <h4 className="text-sm font-black text-text-main group-hover:text-primary transition-colors truncate uppercase tracking-tight">{device.name}</h4>
+                                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+                                        </div>
+                                        <p className="text-[10px] text-text-main-muted font-bold uppercase tracking-widest mt-1">
+                                            {device.ip}:{device.port}
+                                        </p>
+                                    </div>
+                                    <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                                        <Wifi size={14} />
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 mt-auto relative z-10">
+                                    <span className="text-[8px] font-black tracking-[0.2em] text-primary uppercase bg-primary/5 px-2 py-1 rounded">DEVICE ACTIVE</span>
+                                    <span className="text-[8px] font-black tracking-[0.2em] text-text-main-muted uppercase ml-auto">LocalLink NODE</span>
+                                </div>
+                            </div>
+                        ))}
+
+                        {/* Existing Rooms */}
+                        {filteredNearbyRooms.length === 0 && lanDevices.length === 0 ? (
                             <div className="col-span-full text-center py-12 opacity-20 italic text-[10px] text-text-main uppercase tracking-[0.4em] font-black">
                                 No nodes detected in proximity
                             </div>

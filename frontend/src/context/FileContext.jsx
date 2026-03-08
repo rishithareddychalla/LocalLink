@@ -7,60 +7,22 @@ import { useProfile } from './ProfileContext';
 import { SessionContext } from './SessionContext';
 import { apiUpload } from '../services/api';
 
+import { useWebRTC } from './WebRTCContext';
+
+
 const FileContext = createContext();
 
 export const FileProvider = ({ children }) => {
     // Room Files: { [roomId]: [fileObject, ...] }
     const [roomFilesMap, setRoomFilesMap] = useState({});
-
-    // User Persistent Files Metadata
     const [userFiles, setUserFiles] = useState(getUserFiles());
     const [blockedFiles, setBlockedFiles] = useState(new Set());
+
+    const { sendFile, p2pEnabled } = useWebRTC() || {};
     const { addNotification } = useNotifications();
     const { addLogEvent } = useNetworkLog();
     const { profile } = useProfile();
     const { token } = useContext(SessionContext);
-
-    // Revoke Blob URLs (Legacy, but kept for cleanup)
-    const revokeRoomFiles = useCallback((roomId) => {
-        setRoomFilesMap(prev => {
-            const updated = { ...prev };
-            delete updated[roomId];
-            return updated;
-        });
-    }, []);
-
-    const uploadFile = async (roomId, file) => {
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('roomId', roomId);
-            formData.append('userId', profile.id); // Use real user ID
-
-            const response = await apiUpload('/files/upload', formData);
-            if (response.success) {
-                addLogEvent("Transfer", "File Uploaded", `Uploaded ${file.name}`);
-
-                // Add to persistent history
-                const metadata = {
-                    id: response.data.id,
-                    name: response.data.name,
-                    size: response.data.size,
-                    type: file.type,
-                    uploadedBy: profile.id,
-                    roomId: roomId,
-                    sharedAt: new Date().toISOString()
-                };
-                addFileToHistory('sharedByMe', metadata);
-                setUserFiles(getUserFiles());
-            }
-            return response;
-        } catch (error) {
-            console.error('Upload failed:', error);
-            addLogEvent("Transfer", "Upload Failed", `Failed to upload ${file.name}`);
-            return { success: false, error: error.message };
-        }
-    };
 
     const addRoomFile = useCallback((roomId, fileData) => {
         setRoomFilesMap(prev => {
@@ -81,6 +43,97 @@ export const FileProvider = ({ children }) => {
             };
         });
     }, [token]);
+
+    const revokeRoomFiles = useCallback((roomId) => {
+        setRoomFilesMap(prev => {
+            const updated = { ...prev };
+            delete updated[roomId];
+            return updated;
+        });
+    }, []);
+
+    // ... useEffect for P2P File Completion ...
+    useEffect(() => {
+        const handleP2PFile = (event) => {
+            const { from, file } = event.detail;
+            console.log(`[FileContext] Received P2P file from ${from}:`, file.name);
+
+            // Add to room files map (needs roomId)
+            if (file.roomId) {
+                addRoomFile(file.roomId, file);
+
+                addNotification({
+                    type: "download",
+                    title: "File Received (P2P)",
+                    message: `Received ${file.name} directly from a peer.`,
+                    fileName: file.name,
+                    timestamp: Date.now()
+                });
+            }
+        };
+
+        window.addEventListener('webrtc_file_complete', handleP2PFile);
+        return () => window.removeEventListener('webrtc_file_complete', handleP2PFile);
+    }, [addRoomFile, addNotification]);
+
+    const uploadFile = async (roomId, file) => {
+        const metadata = {
+            id: crypto.randomUUID(),
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            uploadedBy: profile.id,
+            roomId: roomId,
+            sharedAt: new Date().toISOString(),
+            isP2P: p2pEnabled
+        };
+
+        if (p2pEnabled && sendFile) {
+            console.log(`[FileContext] Starting P2P upload for ${file.name}`);
+            try {
+                await sendFile(file, metadata);
+                addLogEvent("Transfer", "File Shared (P2P)", `Shared ${file.name} via WebRTC`);
+
+                // Add to local UI immediately
+                addRoomFile(roomId, metadata);
+
+                // Add to persistent history
+                addFileToHistory('sharedByMe', metadata);
+                setUserFiles(getUserFiles());
+
+                return { success: true, data: metadata };
+            } catch (err) {
+                console.error('[FileContext] P2P Upload failed, falling back to API', err);
+            }
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('roomId', roomId);
+            formData.append('userId', profile.id);
+
+            const response = await apiUpload('/files/upload', formData);
+            if (response.success) {
+                addLogEvent("Transfer", "File Uploaded", `Uploaded ${file.name}`);
+
+                const sharedMetadata = {
+                    ...metadata,
+                    id: response.data.id,
+                    isP2P: false
+                };
+
+                addFileToHistory('sharedByMe', sharedMetadata);
+                setUserFiles(getUserFiles());
+            }
+            return response;
+        } catch (error) {
+            console.error('Upload failed:', error);
+            addLogEvent("Transfer", "Upload Failed", `Failed to upload ${file.name}`);
+            return { success: false, error: error.message };
+        }
+    };
+
 
     const trackDownload = useCallback((roomId, file) => {
         // Security Scan before allowing download

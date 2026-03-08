@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const os = require('os');
+const mdnsService = require('../services/mdnsService');
 const deviceStore = require('../store/deviceStore');
-const networkScanner = require('../services/networkScanner');
 
 function getLocalIp() {
     const interfaces = os.networkInterfaces();
@@ -29,24 +29,62 @@ router.get('/devices', async (req, res) => {
     const subnetPrefix = getSubnetPrefix(localIp);
 
     try {
-        // Get devices from our active tracking store
-        const trackedDevices = deviceStore.getDevices();
-
-        // Filter by same subnet if we have a valid local IP
-        const filteredDevices = subnetPrefix
-            ? trackedDevices.filter(d => d.ipAddress && d.ipAddress.startsWith(subnetPrefix))
-            : trackedDevices;
-
-        // Map to safe public format for frontend
-        const devices = filteredDevices.map(d => ({
-            id: d.id,
-            name: d.nickname || 'Unknown Device',
-            ip: d.ipAddress,
-            avatar: d.avatar,
-            status: d.status || 'online',
-            connectedAt: d.connectedAt,
-            lastSeen: d.lastSeen
+        // 1. Get nodes discovered via mDNS (other servers)
+        const mdnsNodes = mdnsService.getDiscoveredDevices().map(d => ({
+            ...d,
+            type: 'node',
+            discoveryMethod: 'mDNS'
         }));
+
+        // 2. Get active socket clients (logged in devices)
+        const socketClients = deviceStore.getDevices()
+            .filter(d => d.ipAddress !== '127.0.0.1') // Hide loopback
+            .map(d => ({
+                id: d.id,
+                name: d.nickname || 'Anonymous Device',
+                ip: d.ipAddress,
+                avatar: d.avatar,
+                status: d.status || 'online',
+                connectedAt: d.connectedAt,
+                lastSeen: d.lastSeen,
+                type: 'client',
+                discoveryMethod: 'Socket'
+            }));
+
+        console.log(`[Discovery] mDNS Nodes: ${mdnsNodes.length}, Socket Clients: ${socketClients.length}`);
+
+        // 3. Merge and deduplicate
+        // One card per unique identity (ID) and IP combination
+        const deviceMap = new Map();
+
+        // Add mDNS nodes first
+        mdnsNodes.forEach(node => {
+            if (node.ip !== '127.0.0.1' && node.ip !== localIp) {
+                deviceMap.set(node.id, node);
+            }
+        });
+
+        // Add socket clients, merging with existing mDNS nodes if they share IP or ID
+        socketClients.forEach(client => {
+            // Ignore self in socket list to avoid duplicates with "device-me"
+            if (client.ip === localIp) return;
+
+            // Try to find matching mDNS node by ID or IP
+            let match = deviceMap.get(client.id);
+            if (!match) {
+                match = Array.from(deviceMap.values()).find(n => n.ip === client.ip);
+            }
+
+            if (match) {
+                // Merge info, preferring socket client details (nick/avatar)
+                deviceMap.set(match.id, { ...match, ...client });
+            } else {
+                deviceMap.set(client.id, client);
+            }
+        });
+
+        const devices = Array.from(deviceMap.values());
+        console.log(`[Discovery] Final device count (excluding self): ${devices.length}`);
 
         res.json({
             success: true,
@@ -60,31 +98,13 @@ router.get('/devices', async (req, res) => {
     }
 });
 
+// Deprecated: mDNS handles discovery automatically now
 router.get('/scan', async (req, res) => {
-    try {
-        console.log("Active LAN scan requested...");
-        const results = await networkScanner.scanSubnet();
-
-        // Map to expected frontend format
-        const devices = results.devices.map((d, index) => ({
-            id: `discovered-${index}-${d.ip}`,
-            name: `Discovered Device (${d.ip})`,
-            ip: d.ip,
-            status: 'online',
-            type: 'terminal', // Use generic type for discovered pings
-            lastSeen: 'Just now'
-        }));
-
-        res.json({
-            success: true,
-            localIp: results.localIp,
-            subnetPrefix: results.subnetPrefix,
-            devices
-        });
-    } catch (error) {
-        console.error("LAN scan failed:", error);
-        res.status(500).json({ success: false, error: error.message });
-    }
+    res.json({
+        success: true,
+        message: 'Active scanning is deprecated. mDNS discovery is automatic.',
+        devices: []
+    });
 });
 
 module.exports = router;

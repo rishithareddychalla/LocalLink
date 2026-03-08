@@ -208,6 +208,31 @@ const socketHandler = (io) => {
             socket.to(roomId).emit('typing_update', { userId, nickname, isTyping });
         });
 
+        // WebRTC Signaling Relay
+        socket.on('webrtc_offer', ({ target, offer }) => {
+            console.log(`[WebRTC] Relay OFFER from ${socket.id} to ${target}`);
+            io.to(target).emit('webrtc_offer', {
+                from: socket.id,
+                offer
+            });
+        });
+
+        socket.on('webrtc_answer', ({ target, answer }) => {
+            console.log(`[WebRTC] Relay ANSWER from ${socket.id} to ${target}`);
+            io.to(target).emit('webrtc_answer', {
+                from: socket.id,
+                answer
+            });
+        });
+
+        socket.on('webrtc_ice_candidate', ({ target, candidate }) => {
+            // console.log(`[WebRTC] Relay ICE from ${socket.id} to ${target}`);
+            io.to(target).emit('webrtc_ice_candidate', {
+                from: socket.id,
+                candidate
+            });
+        });
+
         socket.on('disconnect', async () => {
             console.log('Client disconnected:', socket.id);
 

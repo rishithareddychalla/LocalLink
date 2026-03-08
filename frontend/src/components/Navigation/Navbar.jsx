@@ -7,11 +7,14 @@ import { useProfile } from '../../context/ProfileContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useClickOutside } from '../../hooks/useClickOutside';
 
+import useNetwork from '../../hooks/useNetwork';
+
 const Navbar = () => {
     const navigate = useNavigate();
     const { toggleSidebar } = useStore();
     const { notifications, unreadCount, markAsRead, clearNotifications } = useNotifications();
     const { profile } = useProfile();
+    const { lanIp } = useNetwork();
     const [showNotifications, setShowNotifications] = React.useState(false);
     const notificationRef = React.useRef(null);
 
@@ -33,7 +36,7 @@ const Navbar = () => {
                 </button>
                 <div className="flex items-center gap-2 text-primary text-[10px] md:text-sm font-medium truncate max-w-[150px] md:max-w-none">
                     <Users size={16} className="shrink-0" />
-                    <span className="truncate">LAN 192.168.1.104</span>
+                    <span className="truncate">LAN {lanIp || 'Detecting...'}</span>
                 </div>
             </div>
 

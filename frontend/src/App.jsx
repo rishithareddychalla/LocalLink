@@ -24,6 +24,7 @@ import { NotificationProvider } from './context/NotificationContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { ProfileProvider } from './context/ProfileContext';
 import { NetworkLogProvider } from './context/NetworkLogContext';
+import { WebRTCProvider } from './context/WebRTCContext';
 import { useNavigate } from 'react-router-dom';
 
 const App = () => {
@@ -68,42 +69,44 @@ const App = () => {
               <NotificationProvider>
                 <FileProvider>
                   <RoomProvider>
-                    <Routes>
-                      <Route path="/" element={<LandingPage />} />
-                      <Route path="/documentation" element={<Documentation />} />
+                    <WebRTCProvider>
+                      <Routes>
+                        <Route path="/" element={<LandingPage />} />
+                        <Route path="/documentation" element={<Documentation />} />
 
-                      {/* Protected Routes */}
-                      <Route path="/profile" element={
-                        <ProtectedRoute>
-                          <Profile />
-                        </ProtectedRoute>
-                      } />
+                        {/* Protected Routes */}
+                        <Route path="/profile" element={
+                          <ProtectedRoute>
+                            <Profile />
+                          </ProtectedRoute>
+                        } />
 
-                      <Route path="/join/:roomId" element={
-                        <ProtectedRoute>
-                          <JoinRoom />
-                        </ProtectedRoute>
-                      } />
+                        <Route path="/join/:roomId" element={
+                          <ProtectedRoute>
+                            <JoinRoom />
+                          </ProtectedRoute>
+                        } />
 
-                      <Route element={
-                        <ProtectedRoute>
-                          <MainLayout />
-                        </ProtectedRoute>
-                      }>
-                        <Route path="/dashboard" element={<Dashboard />} />
-                        <Route path="/rooms" element={<Rooms />} />
-                        <Route path="/room/:roomId" element={<RoomInterface />} />
-                        <Route path="/files" element={<FilesManagement />} />
-                        <Route path="/quiz" element={<QuizMode />} />
-                        <Route path="/settings" element={<Settings />} />
-                      </Route>
+                        <Route element={
+                          <ProtectedRoute>
+                            <MainLayout />
+                          </ProtectedRoute>
+                        }>
+                          <Route path="/dashboard" element={<Dashboard />} />
+                          <Route path="/rooms" element={<Rooms />} />
+                          <Route path="/room/:roomId" element={<RoomInterface />} />
+                          <Route path="/files" element={<FilesManagement />} />
+                          <Route path="/quiz" element={<QuizMode />} />
+                          <Route path="/settings" element={<Settings />} />
+                        </Route>
 
-                      {/* Error Handling Routes */}
-                      <Route path="/connection-lost" element={<ConnectionLost />} />
-                      <Route path="/system-error" element={<SystemError />} />
-                      <Route path="/404" element={<NotFound />} />
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
+                        {/* Error Handling Routes */}
+                        <Route path="/connection-lost" element={<ConnectionLost />} />
+                        <Route path="/system-error" element={<SystemError />} />
+                        <Route path="/404" element={<NotFound />} />
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </WebRTCProvider>
                   </RoomProvider>
                 </FileProvider>
               </NotificationProvider>

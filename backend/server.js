@@ -42,6 +42,10 @@ app.set('io', io);
 // Socket Handler
 socketHandler(io);
 
+// mDNS Service for LAN Discovery
+const mdnsService = require('./services/mdnsService');
+mdnsService.init(io);
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
