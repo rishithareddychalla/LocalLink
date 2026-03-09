@@ -11,7 +11,6 @@ import {
     Copy,
     Check,
     ArrowRight,
-    QrCode,
     Lock,
     UserCircle,
     Search
@@ -241,9 +240,9 @@ const Rooms = () => {
                                 </div>
                             </div>
 
-                            <div className="space-y-3">
+                            <div className="space-y-5 pt-3 pb-3">
                                 <label className="text-[10px] font-bold text-text-main-muted uppercase tracking-widest pl-1">Theme Override</label>
-                                <div className="flex items-center gap-2 pt-1 overflow-x-auto no-scrollbar pb-1">
+                                <div className="flex items-center gap-5 p-3 px-2 overflow-x-auto no-scrollbar">
                                     {colors.map((c) => (
                                         <button
                                             key={c}
@@ -294,18 +293,19 @@ const Rooms = () => {
                     <motion.div
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className="glass-panel p-6 sm:p-8 rounded-[28px] md:rounded-[32px] space-y-6"
+                        className="glass-panel p-6 rounded-[28px] md:rounded-[32px] space-y-6"
                     >
-                        <div className="space-y-6">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-                                    style={{ backgroundColor: `${settings.accentColor}0d` }}>
-                                    <Users style={{ color: settings.accentColor }} size={20} />
-                                </div>
-                                <h2 className="text-xl md:text-2xl font-bold text-text-main tracking-tight">Join Room</h2>
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
+                                style={{ backgroundColor: `${settings.accentColor}0d` }}>
+                                <Users style={{ color: settings.accentColor }} size={20} />
                             </div>
+                            <h2 className="text-xl md:text-2xl font-bold text-text-main tracking-tight">Join Room</h2>
+                        </div>
 
-                            <div className="relative group">
+                        {/* Room ID Input Row */}
+                        <div className="flex flex-col sm:flex-row gap-4">
+                            <div className="flex-1 relative group">
                                 <input
                                     type="text"
                                     value={roomCode}
@@ -316,70 +316,60 @@ const Rooms = () => {
                                     onFocus={(e) => e.target.style.borderColor = settings.accentColor}
                                     onBlur={(e) => e.target.style.borderColor = `${joinThemeColor}14`}
                                 />
-                                <button
-                                    onClick={handleJoinRoom}
-                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 w-12 h-12 text-background rounded-xl md:rounded-2xl flex items-center justify-center transition-all active:scale-95 shadow-lg group"
-                                    style={{ backgroundColor: settings.accentColor }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.filter = 'brightness(1.1)';
-                                        e.currentTarget.querySelector('svg').style.transform = 'translateX(2px) scale(1.1)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.filter = 'none';
-                                        e.currentTarget.querySelector('svg').style.transform = 'none';
-                                    }}
-                                >
-                                    <ArrowRight size={24} className="transition-transform duration-300" />
-                                </button>
                             </div>
-
-                            {/* QR Placeholder */}
-                            <div className="aspect-[21/9] bg-background border border-dashed border-border rounded-2xl flex flex-col items-center justify-center gap-3 group cursor-pointer transition-colors"
+                            <button
+                                onClick={handleJoinRoom}
+                                className="w-full sm:w-16 h-14 text-background rounded-2xl flex items-center justify-center transition-all active:scale-95 shadow-lg group shrink-0"
+                                style={{ backgroundColor: settings.accentColor }}
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.borderColor = `${settings.accentColor}2a`;
-                                    e.currentTarget.querySelector('svg').style.color = settings.accentColor;
+                                    e.currentTarget.style.filter = 'brightness(1.1)';
+                                    const svg = e.currentTarget.querySelector('svg');
+                                    if (svg) svg.style.transform = 'translateX(2px) scale(1.1)';
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.borderColor = 'var(--border-color)';
-                                    e.currentTarget.querySelector('svg').style.color = 'var(--text-secondary)';
-                                }}>
-                                <QrCode size={28} className="text-text-main-muted transition-colors" />
-                                <span className="text-[10px] font-bold text-text-main-muted uppercase tracking-[0.2em] text-center px-4">Scan QR</span>
-                            </div>
+                                    e.currentTarget.style.filter = 'none';
+                                    const svg = e.currentTarget.querySelector('svg');
+                                    if (svg) svg.style.transform = 'none';
+                                }}
+                            >
+                                <ArrowRight size={24} className="transition-transform duration-300" />
+                            </button>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row gap-6 mt-4">
-                            <div className="flex-1 space-y-2">
-                                <label className="text-[10px] font-bold text-text-main-muted uppercase tracking-widest pl-1">Your Nickname</label>
-                                <input
-                                    type="text"
-                                    value={nickname}
-                                    onChange={(e) => setNickname(e.target.value)}
-                                    className="w-full bg-background border border-border rounded-xl py-3 px-4 text-sm text-text-main focus:outline-none transition-all"
-                                    style={{ borderColor: 'var(--border-color)' }}
-                                    onFocus={(e) => e.target.style.borderColor = settings.accentColor}
-                                    onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
-                                />
-                            </div>
-                            <div className="sm:w-32 lg:w-40 space-y-2">
-                                <label className="text-[10px] font-bold text-text-main-muted uppercase tracking-widest pl-1">ThemeOverride</label>
-                                <div className="flex items-center gap-2 pt-1 overflow-x-auto no-scrollbar pb-1">
-                                    {colors.map((c) => (
-                                        <button
-                                            key={c}
-                                            onClick={() => setJoinThemeColor(c)}
-                                            className={cn(
-                                                "w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 shrink-0",
-                                                joinThemeColor === c ? "scale-110" : "border-transparent"
-                                            )}
-                                            style={{
-                                                backgroundColor: c,
-                                                borderColor: joinThemeColor === c ? 'var(--text-primary)' : 'transparent',
-                                                boxShadow: joinThemeColor === c ? `0 0 10px ${c}` : 'none'
-                                            }}
-                                        />
-                                    ))}
-                                </div>
+                        {/* Nickname Field */}
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-text-main-muted uppercase tracking-widest pl-1">Your Nickname</label>
+                            <input
+                                type="text"
+                                value={nickname}
+                                onChange={(e) => setNickname(e.target.value)}
+                                className="w-full bg-background border border-border rounded-2xl py-4 px-5 text-sm text-text-main focus:outline-none transition-all"
+                                style={{ borderColor: 'var(--border-color)' }}
+                                onFocus={(e) => e.target.style.borderColor = settings.accentColor}
+                                onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
+                            />
+                        </div>
+
+                        {/* Theme Override Section */}
+                        <div className="space-y-5 pt-4 pb-4">
+                            <label className="text-[10px] font-bold text-text-main-muted uppercase tracking-widest pl-1">Theme Override</label>
+                            <div className="flex items-center gap-5 p-3 px-2 overflow-x-auto no-scrollbar">
+                                {colors.map((c) => (
+                                    <button
+                                        key={c}
+                                        type="button"
+                                        onClick={() => setJoinThemeColor(c)}
+                                        className={cn(
+                                            "w-9 h-9 rounded-full border-2 transition-transform hover:scale-110 shrink-0",
+                                            joinThemeColor === c ? "scale-110" : "border-transparent"
+                                        )}
+                                        style={{
+                                            backgroundColor: c,
+                                            borderColor: joinThemeColor === c ? 'var(--text-primary)' : 'transparent',
+                                            boxShadow: joinThemeColor === c ? `0 0 15px ${c}` : 'none'
+                                        }}
+                                    />
+                                ))}
                             </div>
                         </div>
                     </motion.div>
