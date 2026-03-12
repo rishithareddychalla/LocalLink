@@ -4,6 +4,8 @@ class Device {
   final String ipAddress;
   final String status;
   final String? avatar;
+  final String? deviceType;
+  final DateTime? lastSeen;
 
   Device({
     required this.id,
@@ -11,6 +13,8 @@ class Device {
     required this.ipAddress,
     required this.status,
     this.avatar,
+    this.deviceType,
+    this.lastSeen,
   });
 
   factory Device.fromJson(Map<String, dynamic> json) {
@@ -20,6 +24,8 @@ class Device {
       ipAddress: json['ipAddress'] as String,
       status: json['status'] as String,
       avatar: json['avatar'] as String?,
+      deviceType: json['deviceType'] as String?,
+      lastSeen: json['lastSeen'] != null ? DateTime.parse(json['lastSeen'] as String) : null,
     );
   }
 
@@ -30,6 +36,8 @@ class Device {
       'ipAddress': ipAddress,
       'status': status,
       'avatar': avatar,
+      'deviceType': deviceType,
+      'lastSeen': lastSeen?.toIso8601String(),
     };
   }
 }

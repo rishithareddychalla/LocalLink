@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/socket_service.dart';
-import '../services/mdns_service.dart';
 import '../services/api_service.dart';
 import '../services/auth_service.dart';
 import '../services/network_service.dart';
 import '../models/device.dart';
-import '../models/room.dart';
 import '../core/design_system.dart';
-import '../widgets/device_card.dart';
-import 'room_interface_screen.dart';
-import 'qr_join_screen.dart';
+import '../widgets/global_app_header.dart';
+import '../widgets/global_bottom_nav_bar.dart';
 import 'landing_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -21,279 +18,294 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  List<Room> _rooms = [];
-  bool _isLoadingRooms = true;
-  List<Device> _nearbyNodes = [];
+  List<Device> _nearbyNodes = [
+    Device(id: 'ray', nickname: 'ray (You)', ipAddress: '10.30.201.85', deviceType: 'Laptop', status: 'online'),
+    Device(id: 'rish', nickname: 'rish', ipAddress: '10.30.201.93', deviceType: 'Laptop', status: 'online'),
+  ];
   bool _isLoadingNodes = true;
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  String _userName = 'RAY'; // To be fetched from AuthService
+  int _currentIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _fetchData();
-    // context.read<MdnsService>().startDiscovery(); // Keep mDNS as backup? Or just use API
   }
 
   Future<void> _fetchData() async {
-    await Future.wait([
-      _fetchRooms(),
-      _fetchNearbyNodes(),
-    ]);
-  }
-
-  Future<void> _fetchNearbyNodes() async {
     setState(() => _isLoadingNodes = true);
-    final devices = await NetworkService.getNearbyDevices();
-    setState(() {
-      _nearbyNodes = devices;
-      _isLoadingNodes = false;
-    });
-  }
-
-  Future<void> _fetchRooms() async {
     try {
-      final response = await ApiService.get('/rooms');
-      final List<dynamic> data = response['rooms'];
-      setState(() {
-        _rooms = data.map((r) => Room.fromJson(r)).toList();
-        _isLoadingRooms = false;
-      });
-    } catch (e) {
-      print('Error fetching rooms: $e');
-      setState(() => _isLoadingRooms = false);
-    }
-  }
-
-  void _createRoom() async {
-    try {
-      final response = await ApiService.post('/rooms/create', {
-        'name': 'Room ${DateTime.now().millisecondsSinceEpoch % 1000}',
-      });
-      final room = Room.fromJson(response['data']);
-      _fetchRooms();
-      if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => RoomInterfaceScreen(room: room),
-          ),
-        );
+      final devices = await NetworkService.getNearbyDevices();
+      if (devices.isNotEmpty) {
+        setState(() => _nearbyNodes = devices);
       }
     } catch (e) {
-      print('Error creating room: $e');
+      print('Error fetching nodes: $e');
     }
+    setState(() => _isLoadingNodes = false);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: _scaffoldKey,
-      backgroundColor: DesignSystem.background,
-      appBar: AppBar(
-        title: const Text('RADAR DASHBOARD', style: DesignSystem.heading2),
-        leading: IconButton(
-          icon: const Icon(Icons.menu, color: DesignSystem.accentColor),
-          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: DesignSystem.accentColor),
-            onPressed: _fetchData,
-          ),
-          IconButton(
-            icon: const Icon(Icons.qr_code_scanner, color: DesignSystem.accentColor),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const QrJoinScreen()),
-              );
-            },
-          ),
-        ],
-      ),
-      drawer: _buildDrawer(),
-      body: RefreshIndicator(
-        onRefresh: _fetchRooms,
-        color: DesignSystem.accentColor,
-        backgroundColor: DesignSystem.surface,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Column(
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Section
+          Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSectionHeader('NEARBY NODES', Icons.radar),
-              const SizedBox(height: 16),
-              _isLoadingNodes
-                  ? const Center(child: Padding(
-                      padding: EdgeInsets.all(20.0),
-                      child: CircularProgressIndicator(color: DesignSystem.accentColor),
-                    ))
-                  : _nearbyNodes.isEmpty
-                      ? _buildEmptyState('No nodes discovered yet...', Icons.wifi_find)
-                      : SizedBox(
-                          height: 140,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _nearbyNodes.length,
-                            itemBuilder: (context, index) {
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 12),
-                                child: DeviceCard(device: _nearbyNodes[index]),
-                              );
-                            },
-                          ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  RichText(
+                    text: TextSpan(
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.2,
+                      ),
+                      children: [
+                        const TextSpan(text: 'WELCOME, '),
+                        TextSpan(
+                          text: _userName,
+                          style: const TextStyle(color: DesignSystem.accentColor),
                         ),
-              const SizedBox(height: 32),
-              _buildSectionHeader('OPEN CHANNELS', Icons.meeting_room),
-              const SizedBox(height: 16),
-              _isLoadingRooms
-                  ? const Center(child: CircularProgressIndicator(color: DesignSystem.accentColor))
-                  : _rooms.isEmpty
-                      ? _buildEmptyState('No active channels found', Icons.layers_clear)
-                      : Column(
-                          children: _rooms.map((room) => _buildRoomItem(room)).toList(),
-                        ),
+                      ],
+                    ),
+                  ),
+                  // Top Right Action
+                  OutlinedButton(
+                    onPressed: () {},
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      side: const BorderSide(color: Color(0xFF1E2A32)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'SCAN',
+                      style: TextStyle(
+                        color: DesignSystem.accentColor,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Sub-header details - using Wrap for responsiveness
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const Text(
+                    'SUB-NET RADAR VIEW',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Container(width: 4, height: 4, decoration: const BoxDecoration(color: Colors.white38, shape: BoxShape.circle)),
+                  Text(
+                    '${_nearbyNodes.length} ACTIVE NODES',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 12,
+                runSpacing: 4,
+                children: [
+                  const Text(
+                    'IP: 10.30.201.85',
+                    style: TextStyle(
+                      color: DesignSystem.accentColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const Text(
+                    'STATUS: CONNECTED',
+                    style: TextStyle(
+                      color: DesignSystem.success,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _createRoom,
-        backgroundColor: DesignSystem.accentColor,
-        foregroundColor: Colors.black,
-        child: const Icon(Icons.add, size: 28),
-      ),
-    );
-  }
 
-  Widget _buildSectionHeader(String title, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: DesignSystem.accentColor),
-        const SizedBox(width: 10),
-        Text(title, style: DesignSystem.label),
-        const Spacer(),
-        const Icon(Icons.arrow_forward_ios, size: 10, color: Colors.white24),
-      ],
-    );
-  }
+          const SizedBox(height: 32),
 
-  Widget _buildEmptyState(String message, IconData icon) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(40),
-      decoration: BoxDecoration(
-        color: DesignSystem.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: DesignSystem.borderColor),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, size: 32, color: Colors.white10),
-          const SizedBox(height: 12),
-          Text(
-            message,
-            style: DesignSystem.caption.copyWith(color: Colors.white24),
+          // Search and Invite Row
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 54,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF131B21),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const TextField(
+                    style: TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: InputDecoration(
+                      icon: Icon(Icons.search, color: Colors.white70, size: 20),
+                      hintText: 'SEARCH..',
+                      hintStyle: TextStyle(
+                        color: Colors.white24,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.1,
+                      ),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                height: 54,
+                child: ElevatedButton(
+                  onPressed: () {},
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F3238),
+                    foregroundColor: DesignSystem.accentColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Icon(Icons.share_outlined, size: 20),
+                ),
+              ),
+            ],
           ),
+
+          const SizedBox(height: 32),
+
+          // Devices Grid
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              childAspectRatio: 0.78, // Adjusted for better height
+            ),
+            itemCount: _nearbyNodes.length,
+            itemBuilder: (context, index) {
+              return _RadarDeviceCard(device: _nearbyNodes[index]);
+            },
+          ),
+          
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
+}
 
-  Widget _buildRoomItem(Room room) {
+class _RadarDeviceCard extends StatelessWidget {
+  final Device device;
+
+  const _RadarDeviceCard({required this.device});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: DesignSystem.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: DesignSystem.borderColor),
+        color: const Color(0xFF131B21),
+        borderRadius: BorderRadius.circular(20),
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        leading: Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: DesignSystem.accentColor.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(Icons.group, color: DesignSystem.accentColor),
-        ),
-        title: Text(room.name, style: DesignSystem.heading2.copyWith(fontSize: 16)),
-        subtitle: Text(
-          '${room.participantCount} PEERS ACTIVE • SECURE',
-          style: DesignSystem.label.copyWith(fontSize: 9),
-        ),
-        trailing: const Icon(Icons.chevron_right, color: Colors.white24),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => RoomInterfaceScreen(room: room),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildDrawerItem(IconData icon, String title, bool active, {Color? color, Widget? screen}) {
-    return ListTile(
-      leading: Icon(icon, color: active ? DesignSystem.accentColor : (color ?? Colors.white70), size: 20),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: active ? DesignSystem.accentColor : (color ?? Colors.white70),
-          fontWeight: active ? FontWeight.bold : FontWeight.normal,
-          fontSize: 14,
-        ),
-      ),
-      onTap: () {
-        Navigator.pop(context);
-        if (screen != null) {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
-        } else if (title == 'Logout') {
-          _handleLogout();
-        }
-      },
-    );
-  }
-
-  void _handleLogout() async {
-    await AuthService.logout();
-    if (mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const LandingScreen()),
-        (route) => false,
-      );
-    }
-  }
-
-  Widget _buildDrawer() {
-    return Drawer(
-      backgroundColor: DesignSystem.background,
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          DrawerHeader(
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: DesignSystem.borderColor)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.radar, color: DesignSystem.accentColor, size: 32),
-                const SizedBox(width: 16),
-                const Text('LOCALLINK', style: DesignSystem.heading2),
-              ],
+          // Radar-like background for icon
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              ...List.generate(3, (index) {
+                final double size = 50.0 + (index * 15.0);
+                return Container(
+                  width: size,
+                  height: size,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: DesignSystem.accentColor.withOpacity(0.05),
+                      width: 1,
+                    ),
+                  ),
+                );
+              }),
+              const Icon(
+                Icons.laptop,
+                color: Colors.white,
+                size: 28,
+              ),
+              // Status dot
+              Positioned(
+                bottom: 2,
+                right: 2,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF00FF85),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(0xFF00FF85),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              device.nickname,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
-          _buildDrawerItem(Icons.dashboard, 'Dashboard', true),
-          _buildDrawerItem(Icons.layers, 'Rooms', false), // To be implemented
-          _buildDrawerItem(Icons.folder, 'Files', false),  // To be implemented
-          _buildDrawerItem(Icons.person, 'Profile', false), // To be implemented
-          const Spacer(),
-          _buildDrawerItem(Icons.settings, 'Settings', false), // To be implemented
-          _buildDrawerItem(Icons.logout, 'Logout', false, color: Colors.redAccent),
-          const SizedBox(height: 20),
+          const SizedBox(height: 2),
+          Text(
+            device.ipAddress,
+            style: const TextStyle(
+              color: Colors.white38,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ],
       ),
     );

@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../services/socket_service.dart';
 import '../core/design_system.dart';
 import '../core/config.dart';
+import '../widgets/radar_visualization.dart';
 import 'dashboard_screen.dart';
 
 class LandingScreen extends StatefulWidget {
@@ -18,8 +19,11 @@ class _LandingScreenState extends State<LandingScreen> {
   bool _isLoading = false;
 
   Future<void> _handleLogin() async {
-    final nickname = _nicknameController.text.trim();
-    if (nickname.isEmpty) return;
+    // For now, if nickname is empty, show a dialog or just use a default/placeholder
+    // In the new UI, we might want a cleaner way to handle this.
+    // Let's show a simple nickname dialog when "Enter Local Network" is pressed if not set.
+    String? nickname = await _showNicknameDialog();
+    if (nickname == null || nickname.isEmpty) return;
 
     setState(() => _isLoading = true);
     
@@ -64,135 +68,171 @@ class _LandingScreenState extends State<LandingScreen> {
     setState(() => _isLoading = false);
   }
 
+  Future<String?> _showNicknameDialog() async {
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: DesignSystem.surface,
+        title: const Text('IDENTIFICATION', style: DesignSystem.label),
+        content: TextField(
+          controller: _nicknameController,
+          autofocus: true,
+          style: DesignSystem.body,
+          decoration: InputDecoration(
+            hintText: 'Enter Nickname...',
+            hintStyle: DesignSystem.caption.copyWith(color: Colors.white24),
+            filled: true,
+            fillColor: DesignSystem.background.withOpacity(0.5),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL', style: TextStyle(color: Colors.white38)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, _nicknameController.text.trim()),
+            style: ElevatedButton.styleFrom(backgroundColor: DesignSystem.accentColor),
+            child: const Text('START', style: TextStyle(color: Colors.black)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: DesignSystem.background,
-      body: Stack(
-        children: [
-          // Background Glow
-          Positioned(
-            top: -100,
-            left: -100,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: DesignSystem.accentColor.withOpacity(0.05),
-              ),
-            ),
-          ),
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Top Bar
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Row(
                 children: [
-                  // Logo with glow
-                  Container(
-                    width: 100,
-                    height: 100,
+                   Container(
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: DesignSystem.accentColor.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                      boxShadow: DesignSystem.heroGlow(DesignSystem.accentColor),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(
-                      Icons.radar,
-                      size: 60,
-                      color: DesignSystem.accentColor,
+                    child: const Icon(Icons.radar, color: DesignSystem.accentColor, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'LocalLink',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(height: 32),
-                  const Text(
-                    'LOCALLINK RADAR',
-                    style: DesignSystem.heading1,
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'SECURE P2P COLLABORATION',
-                    style: DesignSystem.label,
-                  ),
-                  const SizedBox(height: 60),
-                  // Input Group
+                  const Spacer(),
+                  // Notification Bell
                   Container(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: DesignSystem.surface,
-                      borderRadius: BorderRadius.circular(24),
+                      shape: BoxShape.circle,
                       border: Border.all(color: DesignSystem.borderColor),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'IDENTIFICATION',
-                          style: DesignSystem.label,
-                        ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: _nicknameController,
-                          style: DesignSystem.body,
-                          decoration: InputDecoration(
-                            hintText: 'Enter Nickname...',
-                            hintStyle: DesignSystem.caption.copyWith(color: Colors.white24),
-                            filled: true,
-                            fillColor: DesignSystem.background.withOpacity(0.5),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: BorderSide.none,
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        ElevatedButton(
-                          onPressed: _isLoading ? null : _handleLogin,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: DesignSystem.accentColor,
-                            foregroundColor: Colors.black,
-                            minimumSize: const Size(double.infinity, 56),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: _isLoading 
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
-                              )
-                            : const Text(
-                                'START CONNECTING',
-                                style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.5),
-                              ),
-                        ),
-                      ],
-                    ),
+                    child: const Icon(Icons.notifications, color: Colors.white70, size: 20),
                   ),
-                  const SizedBox(height: 48),
-                  // Server Config Link
-                  TextButton.icon(
-                    onPressed: _showIpDialog,
-                    icon: const Icon(Icons.settings_ethernet, size: 16, color: Colors.white24),
-                    label: Text(
-                      'SERVER IP: ${AppConfig.currentIp}',
-                      style: DesignSystem.caption.copyWith(color: Colors.white24, letterSpacing: 1),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'v1.0.0 • ENCRYPTED TUNNEL ACTIVE',
-                    style: DesignSystem.caption.copyWith(fontSize: 10),
+                  const SizedBox(width: 12),
+                  // Avatar
+                  const CircleAvatar(
+                    radius: 20,
+                    backgroundImage: NetworkImage('https://i.pravatar.cc/150?u=a042581f4e29026704d'),
                   ),
                 ],
               ),
             ),
-          ),
-        ],
+
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    const SizedBox(height: 24),
+                    // Hero Text
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 40),
+                      child: Column(
+                        children: [
+                          RichText(
+                            textAlign: TextAlign.center,
+                            text: const TextSpan(
+                              style: DesignSystem.heroHeadline,
+                              children: [
+                                TextSpan(text: 'Connect Locally,\n'),
+                                TextSpan(
+                                  text: 'Instantly',
+                                  style: TextStyle(color: DesignSystem.accentColor),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Discover nearby devices for seamless P2P sharing and collaboration.',
+                            textAlign: TextAlign.center,
+                            style: DesignSystem.heroSubheadline,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const RadarVisualization(),
+
+                    const SizedBox(height: 32),
+
+                    // Actions
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      child: Column(
+                        children: [
+                          _ActionButton(
+                            label: 'Enter Local Network',
+                            icon: Icons.cell_tower,
+                            isPrimary: true,
+                            onPressed: _isLoading ? null : _handleLogin,
+                          ),
+                          const SizedBox(height: 16),
+                          _ActionButton(
+                            label: 'Create Room',
+                            icon: Icons.person_add_alt_1,
+                            isPrimary: false,
+                            onPressed: () {
+                              // Navigate to Room Creation logic
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 48),
+                    
+                    // Server Config Link (Keep this for debugging)
+                    TextButton(
+                      onPressed: _showIpDialog,
+                      child: Text(
+                        'SERVER IP: ${AppConfig.currentIp}',
+                        style: DesignSystem.caption.copyWith(color: Colors.white24, fontSize: 10),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
+      bottomNavigationBar: _BottomNavBar(),
     );
   }
 
@@ -236,6 +276,108 @@ class _LandingScreenState extends State<LandingScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isPrimary;
+  final VoidCallback? onPressed;
+
+  const _ActionButton({
+    required this.label,
+    required this.icon,
+    required this.isPrimary,
+    this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: isPrimary ? DesignSystem.accentColor : DesignSystem.surface,
+        foregroundColor: isPrimary ? Colors.black : Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(30),
+          side: isPrimary ? BorderSide.none : BorderSide(color: DesignSystem.borderColor),
+        ),
+        elevation: 0,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 24),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BottomNavBar extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: DesignSystem.background,
+        border: Border(top: BorderSide(color: DesignSystem.borderColor)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _NavBarItem(icon: Icons.explore, label: 'Radar', isSelected: true),
+          _NavBarItem(icon: Icons.people, label: 'Rooms', isSelected: false),
+          _NavBarItem(icon: Icons.cloud_upload, label: 'Files', isSelected: false),
+          _NavBarItem(icon: Icons.settings, label: 'Settings', isSelected: false),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavBarItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isSelected;
+
+  const _NavBarItem({
+    required this.icon,
+    required this.label,
+    required this.isSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          color: isSelected ? DesignSystem.accentColor : Colors.white38,
+          size: 24,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? DesignSystem.accentColor : Colors.white38,
+            fontSize: 10,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ],
     );
   }
 }

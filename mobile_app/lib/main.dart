@@ -8,6 +8,7 @@ import 'services/mdns_service.dart';
 import 'services/api_service.dart';
 import 'screens/landing_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/main_navigation_scaffold.dart';
 import 'models/user.dart';
 
 void main() async {
@@ -45,7 +46,6 @@ class LocalLinkApp extends StatelessWidget {
           surface: DesignSystem.surface,
           onSurface: DesignSystem.textPrimary,
         ),
-        fontFamily: 'Inter',
         appBarTheme: const AppBarTheme(
           backgroundColor: DesignSystem.background,
           elevation: 0,
@@ -118,6 +118,6 @@ class _AuthCheckState extends State<AuthCheck> {
       );
     }
     
-    return _user != null ? const DashboardScreen() : const LandingScreen();
+    return _user != null ? MainNavigationScaffold() : const LandingScreen();
   }
 }
